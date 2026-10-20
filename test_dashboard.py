@@ -96,6 +96,36 @@ class PollTests(unittest.TestCase):
             app.STATE.clear()
             app.STATE.update(original)
 
+    def test_collection_uses_one_run_request_per_repo(self):
+        original = dict(app.STATE)
+        try:
+            with patch.object(app, 'REPOS', ['owner/repo']), patch.object(app, 'gh_items', return_value=[]) as items:
+                app.poll_once()
+            run_calls = [c for c in items.call_args_list if '/actions/runs?' in c.args[0]]
+            self.assertEqual(len(run_calls), 1,
+                             'expected one run-list request per repo, got %d' % len(run_calls))
+        finally:
+            app.STATE.clear()
+            app.STATE.update(original)
+
+    def test_collection_keeps_runs_of_any_status(self):
+        original = dict(app.STATE)
+        runs = [{'id': 1, 'status': 'completed', 'name': 'CI', 'head_branch': 'main',
+                 'head_sha': 'a' * 40, 'created_at': '2026-10-20T10:00:00Z'}]
+        jobs = [{'id': 11, 'name': 'build', 'status': 'completed', 'conclusion': 'success',
+                 'runner_name': 'w1', 'started_at': '2026-10-20T10:00:00Z',
+                 'completed_at': '2026-10-20T10:01:00Z'}]
+        try:
+            with patch.object(app, 'REPOS', ['owner/repo']), \
+                 patch.object(app, 'gh_items', side_effect=[[], runs, jobs]):
+                app.poll_once()
+            self.assertEqual(len(app.STATE['jobs']), 1)
+            self.assertEqual(app.STATE['jobs'][0]['workflow'], 'CI')
+            self.assertEqual(app.STATE['jobs'][0]['run_id'], 1)
+        finally:
+            app.STATE.clear()
+            app.STATE.update(original)
+
     def test_http_failure_preserves_jobs(self):
         original = dict(app.STATE)
         error = urllib.error.HTTPError('https://api.github.com/test', 403, 'Forbidden', {}, None)

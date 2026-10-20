@@ -96,12 +96,14 @@ def _collect():
             errs.append(f"{repo} runners: HTTP {e.code} (needs Administration: read)")
             e.close()
         runs = {}
-        for q in ("status=in_progress", "status=queued", "status=waiting", f"created=%3E{since}&per_page=100"):
-            try:
-                for run in gh_items(f"/repos/{repo}/actions/runs?{q}", "workflow_runs"):
-                    runs[run["id"]] = run
-            except urllib.error.HTTPError:
-                raise
+        try:
+            # One request per repo instead of one per status: the created window
+            # already bounds the result, and a separate status filter per query
+            # multiplied the API calls by four.
+            for run in gh_items(f"/repos/{repo}/actions/runs?per_page=100&created=%3E{since}", "workflow_runs"):
+                runs[run["id"]] = run
+        except urllib.error.HTTPError:
+            raise
         for run in runs.values():
             try:
                 js = gh_items(f"/repos/{repo}/actions/runs/{run['id']}/jobs?per_page=100", "jobs")
