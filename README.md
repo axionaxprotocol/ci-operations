@@ -151,4 +151,4 @@ These modes exercise credential encryption, native setup controls, bundled resou
 
 ## Licensing
 
-A project license has not yet been selected. Public visibility alone does not grant a general license to reuse or redistribute the code. Third-party dependencies retain their respective licenses; review their terms before distributing packaged builds.
+No license has been selected yet; third-party dependencies retain their own licenses. Public visibility alone does not grant a general license to reuse or redistribute the code. Third-party dependencies retain their respective licenses; review their terms before distributing packaged builds.

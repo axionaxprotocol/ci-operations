@@ -25,6 +25,22 @@ class ServiceTests(unittest.TestCase):
         finally:
             service.close()
 
+    def test_non_ascii_cookie_is_rejected_cleanly(self):
+        import http.client
+        import socket
+        service = desktop_service.DesktopService({'token': 'TEST-ONLY-NOT-REAL', 'repos': ['o/r']}, poll=False)
+        service.start()
+        try:
+            with socket.create_connection(('127.0.0.1', service.server.server_port), timeout=5) as connection:
+                connection.sendall(('GET /api/state HTTP/1.1\r\nHost: ' + service.host +
+                                    '\r\nCookie: ' + service.cookie + '=ทุจริต\r\nConnection: close\r\n\r\n').encode())
+                response = http.client.HTTPResponse(connection)
+                response.begin()
+                self.assertEqual(response.status, 401)
+                response.close()
+        finally:
+            service.close()
+
     def test_session_gate_and_cleanup(self):
         service = desktop_service.DesktopService({'token': 'TEST-ONLY-NOT-REAL', 'repos': ['o/r']}, poll=False)
         service.start()

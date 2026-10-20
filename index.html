@@ -19,7 +19,7 @@
  <div class="brand"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span><strong>CI Operations</strong></div>
  <div class="workspace"><div class="overline">Workspace</div><strong>GitHub Actions</strong><div class="muted small">Runner observability</div></div>
  <nav class="nav"><a href="#main" aria-label="Overview"><span class="nav-symbol" aria-hidden="true">▦</span>Overview</a><a href="#fleet" aria-label="Runner fleet"><span class="nav-symbol" aria-hidden="true">▤</span>Runner fleet</a><a href="#activity" aria-label="Timeline"><span class="nav-symbol" aria-hidden="true">≋</span>Activity timeline</a><a href="#history" aria-label="Job history"><span class="nav-symbol" aria-hidden="true">↗</span>Job history</a></nav>
- <div class="side-foot"><div class="overline">Data source</div><strong>GitHub REST API</strong><p>Read-only monitoring</p><p>Browser refresh · 10s</p><p>Timezone · Asia/Bangkok</p></div>
+ <div class="side-foot"><div class="overline">Data source</div><strong>GitHub REST API</strong><p>Read-only monitoring</p><p>Browser refresh · 10s</p><p>Timezone · system local</p></div>
 </aside>
 <div class="main">
  <div class="topbar"><div class="breadcrumb">Infrastructure<span>/</span>CI platform<span>/</span><b>Overview</b></div><div class="top-meta"><span class="local">READ ONLY</span><span id="connection" role="status" aria-live="polite">Connecting...</span></div></div>
@@ -34,7 +34,7 @@
   </div>
   <section class="panel timeline-panel" id="activity"><div class="panel-head"><div class="panel-title"><h2>Execution timeline</h2><span class="count">60 MIN</span></div><div class="legend"><span><i class="dot good"></i>Success</span><span><i class="dot danger"></i>Failed</span><span><i class="dot warning"></i>Running</span></div></div><div class="timeline-wrap"><div id="gantt" class="timeline"></div></div></section>
   <section class="panel results-panel" id="history"><div class="panel-head"><div class="panel-title"><h2>Recent executions</h2><span id="done-count" class="count">—</span></div><span class="panel-note">Latest 25 jobs · excluding skipped</span></div><div id="done"></div></section>
-  <footer class="footer"><span id="meta">Waiting for server data</span><span>ICT / UTC+07:00 · Read-only console</span></footer>
+  <footer class="footer"><span id="meta">Waiting for server data</span><span id="timezone">Local time · Read-only console</span></footer>
  </main>
 </div>
 </div>
@@ -46,7 +46,8 @@ const stamp=v=>v?Date.parse(v):NaN;
 const now=()=>S?.snapshot&&Number.isFinite(stamp(S.updated))?stamp(S.updated):Date.now();
 const runnerKey=r=>JSON.stringify([r.repo||'',r.runner||r.name||'']);
 const dur=ms=>{if(!Number.isFinite(ms))return '—';const s=Math.floor(Math.max(0,ms)/1000);return(s>=3600?Math.floor(s/3600)+'h ':'')+Math.floor(s%3600/60)+'m '+s%60+'s'};
-const clock=v=>Number.isFinite(stamp(v))?new Date(v).toLocaleTimeString('en-GB',{timeZone:'Asia/Bangkok'}):'—';
+const zone=Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC';
+const clock=v=>Number.isFinite(stamp(v))?new Date(v).toLocaleTimeString('en-GB',{timeZone:zone}):'—';
 const lbl=j=>(j.pr?'#'+j.pr:j.branch||'—')+' · '+(j.workflow||'');
 const safeURL=v=>{try{const u=new URL(v);return u.protocol==='https:'?u.href:null}catch{return null}};
 function jobLink(j,cls=''){const u=safeURL(j.url);return u?`<a class="${cls}" href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(j.name||'Untitled job')}</a>`:`<span class="${cls}">${esc(j.name||'Untitled job')}</span>`;}
@@ -77,7 +78,7 @@ function render(){if(!S)return;const V=filteredState(),running=V.jobs.filter(j=>
  const recent=finished.sort((a,b)=>(stamp(b.completed)||0)-(stamp(a.completed)||0)).slice(0,25);$('done-count').textContent=recent.length;
  const resultClasses=['success','failure','timed_out','cancelled','neutral','action_required','startup_failure'];
  $('done').innerHTML=recent.length?'<div class="table-wrap"><table><thead><tr><th scope="col">RESULT</th><th scope="col">JOB / WORKFLOW</th><th scope="col">REPOSITORY</th><th scope="col">BRANCH / PR</th><th scope="col">RUNNER</th><th scope="col">DURATION</th><th scope="col">FINISHED · ICT</th></tr></thead><tbody>'+recent.map(j=>`<tr><td><span class="result ${resultClasses.includes(j.conclusion)?j.conclusion:'neutral'}"><i class="dot"></i>${esc(j.conclusion||'unknown')}</span></td><td class="job-cell">${jobLink(j)}<small>${esc(j.workflow||'—')}</small></td><td>${esc(j.repo||'—')}</td><td class="mono">${esc(j.pr?'#'+j.pr:j.branch||'—')}</td><td class="mono">${esc(j.runner||'—')}</td><td class="mono">${dur(stamp(j.completed)-stamp(j.started))}</td><td class="mono">${clock(j.completed)}</td></tr>`).join('')+'</tbody></table></div>':empty('No completed executions yet','Up to 25 jobs from the data retrieved by the server');
- $('meta').textContent='Updated '+clock(S.updated)+' ICT · API remaining '+(S.rate??'—')+' · refresh 10s';
+ $('meta').textContent='Updated '+clock(S.updated)+' '+zone+' · API remaining '+(S.rate??'—')+' · refresh 10s';
  $('health').textContent=offline?offline+' runner(s) offline · check fleet':fleet.length?'No offline runners in the current selection':'No runner data available';
  $('health').className='health-pill '+(offline?'warning':fleet.length?'good':'neutral');
  $('err').innerHTML=S.error?'<div class="err">Data may be incomplete: '+esc(S.error)+'</div>':'';tick();

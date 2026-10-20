@@ -14,6 +14,11 @@ function page(state) {
   vm.runInContext(script.replace(/;load\(\);setInterval/, ';setInterval'), context);
   return {context, element};
 }
+test('timestamps follow the viewer timezone instead of a hardcoded one',()=>{
+ assert.ok(!html.includes('Asia/Bangkok'));
+ assert.ok(!html.includes('UTC+07:00'));
+ assert.ok(html.includes('Intl.DateTimeFormat().resolvedOptions().timeZone'));
+});
 test('all application-authored dashboard text is English',()=>{
  assert.doesNotMatch(html, /[\u0E00-\u0E7F]/);
  assert.match(html, /<html lang="en">/);

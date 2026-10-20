@@ -51,7 +51,11 @@ class DesktopService:
                     supplied = cookie[owner.cookie].value if owner.cookie in cookie else ''
                 except Exception:
                     supplied = ''
-                if not secrets.compare_digest(supplied, owner.secret):
+                try:
+                    valid = secrets.compare_digest(supplied, owner.secret)
+                except (TypeError, ValueError):
+                    valid = False
+                if not valid:
                     self.send_error(401)
                     return
                 super().do_GET()
