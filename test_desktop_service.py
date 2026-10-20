@@ -83,6 +83,19 @@ class ServiceTests(unittest.TestCase):
         finally:
             service.close()
 
+    def test_removing_the_settings_file_clears_the_token(self):
+        from unittest.mock import patch
+        service = desktop_service.DesktopService({'token': 'TEST-ONLY-NOT-REAL', 'repos': ['o/r']}, poll=False)
+        try:
+            with patch.object(service, '_settings_stamp', return_value=None):
+                service.settings_stamp = 12345
+                service.watch_settings()
+            self.assertEqual(desktop_service.dashboard.TOKEN, '')
+            self.assertEqual(desktop_service.dashboard.REPOS, [])
+            self.assertIn('removed', desktop_service.dashboard.STATE['error'])
+        finally:
+            service.close()
+
     def test_session_gate_and_cleanup(self):
         service = desktop_service.DesktopService({'token': 'TEST-ONLY-NOT-REAL', 'repos': ['o/r']}, poll=False)
         service.start()

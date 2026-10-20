@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.0.12] - 2026-10-20
+
+### Fixed
+
+- Removing the saved token from the settings window left the running dashboard polling with the old token. The dashboard now drops the credentials and asks the user to configure the app again.
+
+
 ## [1.0.11] - 2026-10-20
 
 ### Fixed

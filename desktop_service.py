@@ -130,18 +130,36 @@ class DesktopService:
     def watch_settings(self):
         """Reload credentials saved by a separate settings window."""
         stamp = self._settings_stamp()
-        if stamp is None or stamp == self.settings_stamp:
+        if stamp == self.settings_stamp:
             return
         self.settings_stamp = stamp
+        if stamp is None:
+            # The credentials file was removed: stop using the old token.
+            self.forget_settings()
+            return
         try:
             settings = load_settings()
         except SettingsError:
             LOGGER.warning('saved settings could not be read while watching for changes')
             return
         if not settings:
+            self.forget_settings()
             return
         self.apply_settings(settings)
         LOGGER.info('applied updated credentials from the settings window')
+
+    def forget_settings(self):
+        """Drop the credentials and tell the user to configure the app again."""
+        dashboard.TOKEN = ''
+        dashboard.REPOS = []
+        dashboard._cache.clear()
+        dashboard._etag.clear()
+        dashboard._links.clear()
+        dashboard.STATE['runners'] = []
+        dashboard.STATE['jobs'] = []
+        dashboard.STATE['updated'] = None
+        dashboard.STATE['error'] = 'The saved token was removed. Open GitHub settings to continue.'
+        LOGGER.info('saved credentials were removed')
 
     def _watch(self):
         while not self.stop.is_set():
