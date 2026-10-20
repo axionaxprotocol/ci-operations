@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ci-operations"
-version = "1.0.9"
+version = "1.0.10"
 description = "Local Windows console for GitHub Actions runners, queues and job history"
 readme = "README.md"
 requires-python = ">=3.10"

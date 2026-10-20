@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.0.10] - 2026-10-20
+
+### Fixed
+
+- The settings watcher now starts only for live dashboard sessions, so headless test runs never touch the saved credentials file.
+- The settings integration test no longer depends on a settings file existing on the machine running it.
+
+
 ## [1.0.9] - 2026-10-20
 
 ### Fixed
