@@ -18,6 +18,40 @@ from desktop_store import DATA_DIR, LOG_PATH, SettingsError, load_settings, save
 
 LOGGER = logging.getLogger('ci_operations')
 
+GITHUB_REPO = "axionaxprotocol/ci-operations"
+GITHUB_API = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+CURRENT_VERSION = "1.0.2"
+
+
+def run_auto_update() -> int:
+    import json
+    try:
+        with urllib.request.urlopen(GITHUB_API, timeout=10) as resp:
+            data = json.load(resp)
+        tag = data['tag_name']
+        assets = data.get('assets', [])
+        setup_asset = next((a for a in assets if a['name'].endswith('-Setup.exe')), None)
+        if not setup_asset:
+            LOGGER.info('No installer asset found in latest release')
+            return 1
+        latest_version = tag.lstrip('v')
+        if latest_version <= CURRENT_VERSION:
+            LOGGER.info('Already on latest version %s', CURRENT_VERSION)
+            return 0
+        LOGGER.info('Update available: %s -> %s', CURRENT_VERSION, latest_version)
+        installer_url = setup_asset['browser_download_url']
+        with tempfile.NamedTemporaryFile(suffix='-Setup.exe', delete=False) as tmp:
+            installer_path = tmp.name
+        LOGGER.info('Downloading installer from %s', installer_url)
+        urllib.request.urlretrieve(setup_asset['browser_download_url'], installer_path)
+        LOGGER.info('Running silent installer')
+        subprocess.run([installer_path, '/VERYSILENT', '/NORESTART', '/SUPPRESSMSGBOXES'], check=True, timeout=120)
+        LOGGER.info('Update applied successfully')
+        return 0
+    except Exception as e:
+        LOGGER.error('Auto-update failed: %s', e)
+        return 1
+
 
 def configure_logging():
     try:
@@ -101,8 +135,11 @@ def main():
     parser.add_argument('--self-test-report')
     parser.add_argument('--ui-smoke-report')
     parser.add_argument('--setup-smoke-report')
+    parser.add_argument('--check-update', action='store_true', help='Check and apply update if available')
     configure_logging()
     args = parser.parse_args()
+    if args.check_update:
+        sys.exit(run_auto_update())
     if args.self_test_report:
         self_test(args.self_test_report)
         return
@@ -148,8 +185,8 @@ def main():
         kernel.ReleaseMutex(mutex)
         kernel.CloseHandle(mutex)
     LOGGER.info('application exiting')
-    if reconfigure:
-        subprocess.Popen(launch_command() + ['--configure'], close_fds=True)
+    if reconfigure and not args.check_update:
+        subprocess.Popen(launch_command() + ['--check-update'], close_fds=True)
 
 
 if __name__ == '__main__':
