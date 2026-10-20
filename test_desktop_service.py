@@ -5,6 +5,7 @@ import unittest
 import urllib.error
 import urllib.request
 from pathlib import Path
+from unittest.mock import patch
 
 import desktop_history
 import desktop_service
@@ -172,6 +173,24 @@ class ServiceTests(unittest.TestCase):
         finally:
             service.close()
 
+
+    def test_history_is_pruned_during_a_watch_cycle(self):
+        service = desktop_service.DesktopService({'token': 'TEST-ONLY-NOT-REAL', 'repos': ['o/r']}, poll=False)
+        try:
+            calls = []
+            with patch.object(service.history, 'prune', side_effect=lambda *a, **k: calls.append(a)):
+                service.prune_history()
+            self.assertEqual(len(calls), 1, 'the history was not pruned')
+        finally:
+            service.close()
+
+    def test_pruning_is_safe_when_history_is_disabled(self):
+        service = desktop_service.DesktopService({'token': 'TEST-ONLY-NOT-REAL', 'repos': ['o/r']}, poll=False)
+        service.history = None
+        try:
+            self.assertEqual(service.prune_history(), 0)
+        finally:
+            service.close()
 
     def test_session_gate_and_cleanup(self):
         service = desktop_service.DesktopService({'token': 'TEST-ONLY-NOT-REAL', 'repos': ['o/r']}, poll=False)

@@ -175,6 +175,16 @@ class DesktopService:
             LOGGER.warning('job history could not be written')
             return 0
 
+    def prune_history(self):
+        """Drop history that has aged out of the retention window."""
+        if self.history is None:
+            return 0
+        try:
+            return self.history.prune()
+        except Exception:
+            LOGGER.warning('job history could not be pruned')
+            return 0
+
     def history_payload(self, path, headers):
         """Return the body for a history route, or None when the route is unknown."""
         route = path.split('?', 1)[0]
@@ -260,6 +270,10 @@ class DesktopService:
                 self.watch_settings()
             except Exception:
                 LOGGER.warning('settings watcher failed')
+            try:
+                self.prune_history()
+            except Exception:
+                LOGGER.warning('history pruning failed')
             self.stop.wait(3)
 
     def start(self):
