@@ -1,0 +1,32 @@
+name: Stale issues and pull requests
+
+on:
+  schedule:
+    - cron: '41 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Mark and close stale items
+        uses: actions/stale@4391f3da665fdf50b6810c1a66712fb9ba21aa93 # v11.0.0
+        with:
+          days-before-issue-stale: 60
+          days-before-issue-close: 30
+          days-before-pr-stale: 45
+          days-before-pr-close: 21
+          stale-issue-label: stale
+          stale-pr-label: stale
+          exempt-issue-labels: security,pinned
+          exempt-pr-labels: security,pinned
+          stale-issue-message: This issue has had no activity for 60 days. It will close in 30 days unless there is new information.
+          stale-pr-message: This pull request has had no activity for 45 days. It will close in 21 days unless it is updated.
+          close-issue-message: Closing as stale. Reopen with new details if the problem persists.
+          close-pr-message: Closing as stale. Reopen or submit a fresh pull request when you are ready to continue.

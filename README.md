@@ -1,6 +1,13 @@
 # CI Operations
 
+[![Windows tests](https://github.com/axionaxprotocol/ci-operations/actions/workflows/ci.yml/badge.svg)](https://github.com/axionaxprotocol/ci-operations/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/axionaxprotocol/ci-operations/actions/workflows/codeql.yml/badge.svg)](https://github.com/axionaxprotocol/ci-operations/actions/workflows/codeql.yml)
+[![Latest release](https://img.shields.io/github/v/release/axionaxprotocol/ci-operations)](https://github.com/axionaxprotocol/ci-operations/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A local Windows desktop console for monitoring GitHub Actions runners and jobs. Includes first-run token setup, encrypted credential persistence, and a light, readable operations dashboard.
+
+![CI Operations dashboard](docs/dashboard.png)
 
 ## Features
 
@@ -38,7 +45,7 @@ The build produces:
 - `dist/CI-Operations/CI-Operations.exe`: application and its companion runtime directory.
 - `dist/CI-Operations-Setup.exe`: per-user installer with Desktop and Start menu shortcuts.
 
-Build products are intentionally excluded from Git. This repository does not require users to share credentials to build or test it. Locally built executables are unsigned and may trigger Windows SmartScreen.
+The same build runs in CI on every push and pull request, and tag pushes publish a verified installer release with a SHA-256 checksum and build-provenance attestation. Build products are intentionally excluded from Git. This repository does not require users to share credentials to build or test it. Locally built executables are unsigned and may trigger Windows SmartScreen.
 
 ### First launch
 
@@ -116,6 +123,17 @@ For snapshot mode, set `STATE_FILE` to a JSON file containing `runners` and `job
 
 Connection failures, incomplete API data, and stale data are shown separately from offline runner status. Data older than 90 seconds is marked stale. The collector retrieves active workflows plus recently created runs; this is not a complete historical archive.
 
+## Releases
+
+Tagged releases (`v*`) are built on GitHub-hosted Windows runners from the tagged commit. Each release includes `CI-Operations-Setup.exe` and `SHA256SUMS.txt`. Verify a download with:
+
+```powershell
+Get-FileHash .\CI-Operations-Setup.exe -Algorithm SHA256
+gh attestation verify .\CI-Operations-Setup.exe --repo axionaxprotocol/ci-operations
+```
+
+Releases are signed only when the maintainer configures the `WINDOWS_SIGNING_CERTIFICATE` and `WINDOWS_SIGNING_PASSWORD` repository secrets. Unsigned installers trigger SmartScreen warnings; the release page states the signing status.
+
 ## Tests
 
 On Windows, using the packaging virtual environment:
@@ -149,6 +167,6 @@ These modes exercise credential encryption, native setup controls, bundled resou
 | `desktop_service.py` | Session-gated loopback adapter |
 | `build_desktop.py`, `installer.iss` | Windows application and installer packaging |
 
-## Licensing
+## License
 
-No license has been selected yet; third-party dependencies retain their own licenses. Public visibility alone does not grant a general license to reuse or redistribute the code. Third-party dependencies retain their respective licenses; review their terms before distributing packaged builds.
+[MIT](LICENSE). Third-party dependencies retain their own licenses. Public visibility alone does not grant a general license to reuse or redistribute the code. Third-party dependencies retain their respective licenses; review their terms before distributing packaged builds.

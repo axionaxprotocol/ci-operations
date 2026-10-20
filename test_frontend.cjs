@@ -35,6 +35,12 @@ test('console defaults to a light color scheme',()=>{
  assert.match(html, /--panel:#ffffff/);
  assert.ok(!html.includes('background:#15191c'));
 });
+test('session gate rejects methods that could mutate or echo state',()=>{
+ const source=fs.readFileSync('desktop_service.py','utf8');
+ assert.match(source,/def do_POST\(self\):\s*self\.send_error\(405\)/);
+ assert.match(source,/class GuardedHandler\(dashboard\.H\)/);
+ assert.match(source,/if self\.command != 'GET':/);
+});
 test('untrusted names and links cannot inject HTML', async()=>{
   const p = page({runners:[{name:'<img src=x onerror=alert(1)>',repo:'o/r',status:'online'}],jobs:[{repo:'o/r',name:'<script>bad</script>',status:'queued',created:null,url:'javascript:alert(1)'}],error:'<img src=x>',updated:null});
   await vm.runInContext('load()',p.context);

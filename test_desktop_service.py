@@ -41,6 +41,22 @@ class ServiceTests(unittest.TestCase):
         finally:
             service.close()
 
+    def test_mutating_http_methods_are_rejected(self):
+        import http.client
+        service = desktop_service.DesktopService({'token': 'TEST-ONLY-NOT-REAL', 'repos': ['o/r']}, poll=False)
+        service.start()
+        try:
+            for method in ('POST', 'PUT', 'DELETE', 'PATCH'):
+                with self.subTest(method=method):
+                    connection = http.client.HTTPConnection('127.0.0.1', service.server.server_port, timeout=5)
+                    connection.request(method, '/api/state', body='x')
+                    response = connection.getresponse()
+                    response.read()
+                    self.assertEqual(response.status, 405)
+                    connection.close()
+        finally:
+            service.close()
+
     def test_session_gate_and_cleanup(self):
         service = desktop_service.DesktopService({'token': 'TEST-ONLY-NOT-REAL', 'repos': ['o/r']}, poll=False)
         service.start()

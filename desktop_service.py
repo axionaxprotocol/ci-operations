@@ -20,8 +20,16 @@ class DesktopService:
         self.poll_enabled = poll
         owner = self
 
-        class Handler(dashboard.H):
+        class GuardedHandler(dashboard.H):
+            def do_POST(self):
+                self.send_error(405)
+
+            do_PUT = do_DELETE = do_PATCH = do_OPTIONS = do_POST
+
             def do_GET(self):
+                if self.command != 'GET':
+                    self.send_error(405)
+                    return
                 if self.headers.get('Host') != owner.host:
                     self.send_error(403)
                     return
@@ -60,7 +68,7 @@ class DesktopService:
                     return
                 super().do_GET()
 
-        self.server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+        self.server = ThreadingHTTPServer(('127.0.0.1', 0), GuardedHandler)
         self.server.daemon_threads = True
         self.host = f'127.0.0.1:{self.server.server_port}'
         self.origin = 'http://' + self.host
