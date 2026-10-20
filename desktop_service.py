@@ -15,6 +15,7 @@ LOGGER = logging.getLogger('ci_operations')
 
 HISTORY_PATH = DATA_DIR / 'history.db'
 HISTORY_WINDOWS = {'24h': 24 * 3600, '7d': 7 * 24 * 3600, '30d': 30 * 24 * 3600, 'all': 0}
+HISTORY_PAGE_LIMIT = 50
 
 
 def _window_seconds(value):
@@ -198,7 +199,7 @@ class DesktopService:
             return self.history.export_csv(since=since).encode('utf-8'), 'text/csv; charset=utf-8'
         body = json.dumps({
             'summary': self.reliability(window),
-            'jobs': self.history.export_json(since=since)['jobs'],
+            'jobs': self.history.export_json(since=since, limit=HISTORY_PAGE_LIMIT)['jobs'],
         }).encode('utf-8')
         return body, 'application/json'
 

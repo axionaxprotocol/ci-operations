@@ -192,6 +192,30 @@ class ServiceTests(unittest.TestCase):
         finally:
             service.close()
 
+    def test_history_endpoint_caps_the_number_of_returned_jobs(self):
+        service = desktop_service.DesktopService({'token': 'TEST-ONLY-NOT-REAL', 'repos': ['o/r']}, poll=False)
+        isolated = tempfile.TemporaryDirectory()
+        self.addCleanup(isolated.cleanup)
+        service.history = desktop_history.HistoryStore(Path(isolated.name) / 'history.db')
+        self.addCleanup(service.history.close)
+        service.start()
+        try:
+            for index in range(60):
+                service.history.record([{
+                    'repo': 'o/r', 'run_id': index, 'job_id': index, 'name': f'job{index}',
+                    'workflow': 'CI', 'status': 'completed', 'conclusion': 'success',
+                    'started': '2026-10-20T10:00:00Z', 'completed': '2026-10-20T10:01:00Z',
+                    'steps': []}])
+            opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor())
+            with opener.open(service.launch_url) as response:
+                response.read()
+            with opener.open(service.origin + '/api/history') as response:
+                data = json.load(response)
+            self.assertLessEqual(len(data['jobs']), 50, 'the history payload was not capped')
+            self.assertEqual(data['summary']['total'], 60, 'the summary must count every job')
+        finally:
+            service.close()
+
     def test_session_gate_and_cleanup(self):
         service = desktop_service.DesktopService({'token': 'TEST-ONLY-NOT-REAL', 'repos': ['o/r']}, poll=False)
         service.start()

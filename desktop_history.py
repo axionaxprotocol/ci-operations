@@ -237,9 +237,9 @@ class HistoryStore:
             'generated_at': time.time(),
         }
 
-    def export_json(self, since=None):
+    def export_json(self, since=None, limit=100000):
         """Return the stored history as a JSON-serialisable structure."""
-        jobs = self.jobs(since=since, limit=100000)
+        jobs = self.jobs(since=since, limit=limit)
         keys = [job['key'] for job in jobs]
         steps_by_job = {}
         for step in self.steps_for(keys):
