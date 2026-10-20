@@ -140,6 +140,7 @@ def show_setup(existing=None, notice='', smoke_report=None):
     token = tk.StringVar(value=(existing or {}).get('token', ''))
     repos = tk.StringVar(value=','.join((existing or {}).get('repos', [])) or DEFAULT_REPOS)
     auto = tk.BooleanVar(value=startup_enabled())
+    notify = tk.BooleanVar(value=(existing or {}).get('notifications', True) is not False)
     ttk.Label(frame, text='GitHub Personal Access Token').pack(anchor='w')
     token_row = ttk.Frame(frame)
     token_row.pack(fill='x', pady=(6, 6))
@@ -152,6 +153,7 @@ def show_setup(existing=None, notice='', smoke_report=None):
     ttk.Entry(frame, textvariable=repos).pack(fill='x', pady=(6, 14))
     ttk.Label(frame, text='Required: Actions: Read and Metadata: Read.\nOptional: Administration: Read to view idle and offline runners.', wraplength=670).pack(anchor='w')
     ttk.Checkbutton(frame, text='Launch automatically when I sign in to Windows', variable=auto).pack(anchor='w', pady=(14, 8))
+    ttk.Checkbutton(frame, text='Notify me when a job fails', variable=notify).pack(anchor='w', pady=(0, 8))
     ttk.Label(frame, text='Your token is encrypted with Windows DPAPI for this Windows account.\nIt is never stored in browser localStorage or plaintext files.', wraplength=670).pack(anchor='w', pady=(0, 10))
     status = tk.StringVar(value=notice)
     paste_support = TokenPasteSupport(entry, status)
@@ -207,7 +209,8 @@ def show_setup(existing=None, notice='', smoke_report=None):
         def validate():
             try:
                 validate_access(value, selected)
-                messages.put((True, {'token': value, 'repos': selected, 'poll': 30}, requested_auto))
+                messages.put((True, {'token': value, 'repos': selected, 'poll': 30,
+                                     'notifications': notify.get()}, requested_auto))
             except ValidationError as error:
                 messages.put((False, str(error), requested_auto))
             except Exception:

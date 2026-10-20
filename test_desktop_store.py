@@ -26,6 +26,25 @@ class StoreTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             self.assertIsNone(store.load_settings(Path(directory) / 'missing'))
 
+    def test_notification_toggle_survives_the_roundtrip(self):
+        import tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'settings.dat'
+            store.save_settings({'token': 'TEST-ONLY-NOT-REAL', 'repos': ['o/r'],
+                                 'notifications': False}, path=path)
+            loaded = store.load_settings(path=path)
+            self.assertIs(loaded['notifications'], False)
+
+    def test_missing_notification_toggle_defaults_to_enabled(self):
+        import tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'settings.dat'
+            store.save_settings({'token': 'TEST-ONLY-NOT-REAL', 'repos': ['o/r']}, path=path)
+            loaded = store.load_settings(path=path)
+            self.assertNotIn('notifications', loaded)
+
     def test_repo_validation_rejects_urls_and_paths(self):
         self.assertEqual(store.parse_repos(' owner/a, owner/b '), ['owner/a', 'owner/b'])
         for value in ('https://github.com/a/b', 'a/../../b', 'a/b?x=1', ''):

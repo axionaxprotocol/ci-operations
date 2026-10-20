@@ -7,6 +7,15 @@ import desktop_setup as setup
 
 
 class SetupTests(unittest.TestCase):
+    def test_the_settings_form_offers_a_notification_choice(self):
+        source = open(setup.__file__, encoding='utf-8').read()
+        self.assertIn('Notify me when a job fails', source)
+        self.assertIn('notifications', source)
+
+    def test_the_saved_settings_include_the_notification_choice(self):
+        source = open(setup.__file__, encoding='utf-8').read()
+        self.assertIn("'notifications': notify.get()", source)
+
     def test_public_first_run_does_not_prefill_private_repositories(self):
         self.assertEqual(setup.DEFAULT_REPOS, '')
 
