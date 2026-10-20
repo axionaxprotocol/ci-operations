@@ -19,6 +19,8 @@ A local Windows desktop console for monitoring GitHub Actions runners and jobs. 
 - Durable local job history in SQLite, so reliability data survives restarts. Stored at `%LOCALAPPDATA%\CIOperations\history.db` and never uploaded.
 - A Reliability panel with success rate, failure count, median and 95th-percentile duration, and the steps that fail most often.
 - History windows of 24 hours, 7 days, 30 days, or everything stored, plus CSV export of the selected window.
+- Windows toast notifications when a job fails, so a red build is noticed without watching the window. Toggle them with **Notify me when a job fails** in settings.
+- Adaptive polling that slows down when the GitHub rate limit runs low and speeds up while a job is running.
 - Repository filtering and search, English application text, light theme, and 14px minimum dashboard text.
 - Private WebView2 window backed by a loopback-only server on a random port with a session gate.
 - An optional standard-library-only web server for development or local browser use.
@@ -55,10 +57,12 @@ The same build runs in CI on every push and pull request, and tag pushes publish
 1. Open **CI Operations**.
 2. Enter a fine-grained GitHub PAT and your repositories as comma-separated `owner/repo` names.
 3. Use **Paste** if the keyboard shortcut is unavailable. Paste replaces the token field and trims copied leading/trailing whitespace.
-4. Optionally select **Launch automatically when I sign in to Windows**.
+4. Optionally select **Launch automatically when I sign in to Windows** and **Notify me when a job fails**.
 5. Select **Save and open dashboard**.
 
 On later launches, saved credentials are reused. An expired or revoked token must be replaced. Open **Application > GitHub settings** to change settings or forget credentials.
+
+When a job fails, a Windows toast names the workflow and repository. Windows Focus Assist can suppress toasts; the dashboard shows the same failures in the Reliability panel regardless.
 
 ### Token permissions
 
@@ -124,7 +128,7 @@ For snapshot mode, set `STATE_FILE` to a JSON file containing `runners` and `job
 - **Repository health**: runner availability and active/failed jobs in the retrieved data. Failed includes failure, timed_out, action_required, and startup_failure.
 - **Execution timeline**: jobs with runner names and valid start times within the last 60 minutes; overlapping executions use separate tracks.
 - **Reliability**: success rate, failure count, median duration, and 95th-percentile duration over the locally stored history for the selected window. This covers only jobs seen while the app was running, so it is not a complete historical record of the repository.
-- **Most frequent failing steps**: the steps GitHub reported as failed, ranked by how often they broke. Steps are only recorded for jobs the app observed.
+- **Most frequent failing steps**: the steps GitHub reported as failed, ranked by how often they broke. Steps are only recorded for jobs the app observed. Each recorded step is counted once per job, not once per poll, so the ranking reflects distinct failing jobs.
 
 Connection failures, incomplete API data, and stale data are shown separately from offline runner status. Data older than 90 seconds is marked stale. The collector retrieves active workflows plus recently created runs; this is not a complete historical archive.
 
@@ -171,6 +175,8 @@ These modes exercise credential encryption, native setup controls, bundled resou
 | `desktop_store.py` | Current-user DPAPI encrypted settings |
 | `desktop_service.py` | Session-gated loopback adapter |
 | `desktop_history.py` | Local SQLite history of finished jobs and their steps |
+| `desktop_alerts.py` | Detects newly failed jobs from the recorded history |
+| `desktop_notify.py` | Windows toast notifications, with no third-party dependency |
 | `build_desktop.py`, `installer.iss` | Windows application and installer packaging |
 
 ## License

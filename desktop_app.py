@@ -23,7 +23,7 @@ LOGGER = logging.getLogger('ci_operations')
 
 GITHUB_REPO = "axionaxprotocol/ci-operations"
 GITHUB_API = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "1.1.0"
+CURRENT_VERSION = "1.2.0"
 
 # Two independent locks: the dashboard window and the settings window may run
 # side by side, but never twice of the same kind.

@@ -6,6 +6,21 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-20
+
+### Added
+
+- Windows toast notifications when a job fails. The notification names the workflow, the job and the repository, and includes a link to the failing run. The toast is raised through the Windows notification platform, so no new dependency is added.
+- A **Notify me when a job fails** toggle in the settings window. Notifications are on by default and can be switched off without uninstalling.
+- Adaptive polling. The collector reads the remaining GitHub rate limit from every response and lengthens the poll interval when the budget is thin, so the app stops itself from exhausting the limit. The current interval is shown in the dashboard footer.
+
+### Fixed
+
+- Job steps were recorded once per poll instead of once per job, so a single failure was counted repeatedly and the "most frequent failing steps" ranking was inflated. The step table is now keyed on the job and step number, and existing databases are migrated to the corrected shape. The failing-step counts published with 1.1.0 were therefore higher than the real numbers and are corrected here.
+- Job history was never pruned. The history store now prunes aged entries during the watch cycle, so the database no longer grows without bound.
+- The history endpoint returned every stored job on every request. It now returns a bounded page of 50 jobs; the reliability summary still covers the full window.
+- The collector issued four workflow-run requests per repository per poll. It now issues one, which brings a two-repository setup from 5,760 to 5,040 requests per hour against GitHub's 5,000/hour limit, and the adaptive interval covers the remaining margin.
+
 ## [1.1.0] - 2026-10-20
 
 ### Added
