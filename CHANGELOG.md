@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.0.8] - 2026-10-20
+
+### Added
+
+- Auto-update verifies the downloaded installer against the release's `SHA256SUMS.txt` and refuses to run unverified or mismatched bytes.
+- `parse_checksums()` and `sha256_file()` helpers with unit tests.
+
+
 ## [1.0.7] - 2026-10-20
 
 ### Fixed

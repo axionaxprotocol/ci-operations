@@ -23,7 +23,7 @@ LOGGER = logging.getLogger('ci_operations')
 
 GITHUB_REPO = "axionaxprotocol/ci-operations"
 GITHUB_API = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "1.0.7"
+CURRENT_VERSION = "1.0.8"
 
 
 def latest_release_version():
@@ -38,6 +38,24 @@ def latest_release_version():
     except Exception as e:
         LOGGER.info('Release lookup failed: %s', e)
         return None
+
+
+def parse_checksums(text):
+    """Parse a SHA256SUMS file into {filename: lowercase hex digest}."""
+    sums = {}
+    for line in text.splitlines():
+        parts = line.replace('*', ' ').split()
+        if len(parts) >= 2 and len(parts[0]) == 64:
+            sums[parts[1]] = parts[0].lower()
+    return sums
+
+
+def sha256_file(path, chunk=1 << 20):
+    digest = hashlib.sha256()
+    with open(path, 'rb') as handle:
+        for block in iter(lambda: handle.read(chunk), b''):
+            digest.update(block)
+    return digest.hexdigest()
 
 
 def _schedule_detached_install(installer_path):
@@ -84,7 +102,26 @@ def run_auto_update() -> int:
         with tempfile.NamedTemporaryFile(suffix='-Setup.exe', delete=False) as tmp:
             installer_path = tmp.name
         LOGGER.info('Downloading installer from %s', installer_url)
-        urllib.request.urlretrieve(setup_asset['browser_download_url'], installer_path)
+        urllib.request.urlretrieve(installer_url, installer_path)
+        sums_asset = next((a for a in assets if a['name'] == 'SHA256SUMS.txt'), None)
+        if not sums_asset:
+            LOGGER.error('Release has no SHA256SUMS.txt; refusing to install unverified bytes')
+            return 1
+        with urllib.request.urlopen(sums_asset['browser_download_url'], timeout=15) as resp:
+            expected = parse_checksums(resp.read().decode('utf-8', 'replace'))
+        wanted = expected.get(setup_asset['name'])
+        if not wanted:
+            LOGGER.error('SHA256SUMS.txt has no entry for %s', setup_asset['name'])
+            return 1
+        actual = sha256_file(installer_path)
+        if actual != wanted:
+            LOGGER.error('Installer checksum mismatch; aborting update')
+            try:
+                Path(installer_path).unlink()
+            except OSError:
+                pass
+            return 1
+        LOGGER.info('Installer checksum verified')
         _schedule_detached_install(installer_path)
         return 2
     except Exception as e:
