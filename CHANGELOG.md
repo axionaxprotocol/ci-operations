@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.0.5] - 2026-10-20
+
+### Fixed
+
+- Auto-update failed with "name 'urllib' is not defined" because the updater used `urllib` without importing it. The module is now imported explicitly, so update checks and silent upgrades work.
+
+
 ## [1.0.4] - 2026-10-20
 
 ### Changed

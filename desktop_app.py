@@ -10,6 +10,8 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 from desktop_service import DesktopService
@@ -20,7 +22,7 @@ LOGGER = logging.getLogger('ci_operations')
 
 GITHUB_REPO = "axionaxprotocol/ci-operations"
 GITHUB_API = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "1.0.4"
+CURRENT_VERSION = "1.0.5"
 
 
 def run_auto_update() -> int:
