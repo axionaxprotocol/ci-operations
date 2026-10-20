@@ -6,6 +6,21 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-20
+
+### Added
+
+- Durable local job history in SQLite. Finished jobs and the steps inside them are recorded as they are observed, so reliability data survives an application restart. The database stays at `%LOCALAPPDATA%\CIOperations\history.db` and is never uploaded.
+- A Reliability panel showing success rate, failure count, median duration, and 95th-percentile duration for the selected window.
+- A breakdown of the steps that fail most often, so the usual cause of a red build is visible without opening GitHub.
+- History windows of 24 hours, 7 days, 30 days, or everything stored.
+- CSV export of the selected history window.
+
+### Fixed
+
+- A request that was rejected for using a mutating HTTP method could reset the connection instead of returning a clean 405 response. The request body is now read before the socket is closed.
+
+
 ## [1.0.12] - 2026-10-20
 
 ### Fixed
