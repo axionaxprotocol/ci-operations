@@ -23,7 +23,7 @@ LOGGER = logging.getLogger('ci_operations')
 
 GITHUB_REPO = "axionaxprotocol/ci-operations"
 GITHUB_API = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "1.0.6"
+CURRENT_VERSION = "1.0.7"
 
 
 def latest_release_version():
@@ -38,6 +38,30 @@ def latest_release_version():
     except Exception as e:
         LOGGER.info('Release lookup failed: %s', e)
         return None
+
+
+def _schedule_detached_install(installer_path):
+    """Install after this process exits.
+
+    The installer replaces CI-Operations.exe. Running it inline makes Inno Setup
+    try to close the very process that is waiting on it, which aborts the
+    install with exit code 5. A short-lived detached helper avoids that.
+    """
+    frozen = bool(getattr(sys, 'frozen', False))
+    relaunch = [sys.executable] if frozen else [sys.executable, str(Path(__file__).with_name('desktop_app.py'))]
+    batch = Path(tempfile.gettempdir()) / 'ci-operations-update.cmd'
+    lines = [
+        '@echo off',
+        'ping -n 4 127.0.0.1 >nul',
+        f'"{installer_path}" /VERYSILENT /NORESTART /SUPPRESSMSGBOXES',
+        f'start "" {subprocess.list2cmdline(relaunch)}',
+    ]
+    batch.write_text('\r\n'.join(lines) + '\r\n', encoding='utf-8')
+    flags = 0
+    if hasattr(subprocess, 'DETACHED_PROCESS'):
+        flags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NO_WINDOW
+    subprocess.Popen(['cmd.exe', '/c', str(batch)], creationflags=flags, close_fds=True)
+    LOGGER.info('Installer scheduled; exiting so files can be replaced')
 
 
 def run_auto_update() -> int:
@@ -61,9 +85,7 @@ def run_auto_update() -> int:
             installer_path = tmp.name
         LOGGER.info('Downloading installer from %s', installer_url)
         urllib.request.urlretrieve(setup_asset['browser_download_url'], installer_path)
-        LOGGER.info('Running silent installer')
-        subprocess.run([installer_path, '/VERYSILENT', '/NORESTART', '/SUPPRESSMSGBOXES'], check=True, timeout=180)
-        LOGGER.info('Update applied successfully')
+        _schedule_detached_install(installer_path)
         return 2
     except Exception as e:
         LOGGER.error('Auto-update failed: %s', e)
@@ -136,7 +158,7 @@ def run_dashboard(settings, smoke_report=None):
             if code == 0:
                 messagebox.showinfo('CI Operations', f'CI Operations {CURRENT_VERSION} is up to date.')
             elif code == 2:
-                messagebox.showinfo('CI Operations', 'Update installed. Restart CI Operations to use the new version.')
+                messagebox.showinfo('CI Operations', 'Update downloaded. CI Operations will close, install the update, and reopen automatically.')
             elif code == 1:
                 messagebox.showinfo('CI Operations', 'Update check failed. See the diagnostic log for details.')
         threading.Thread(target=worker, daemon=True).start()
@@ -183,10 +205,8 @@ def main():
     args = parser.parse_args()
     if args.check_update:
         code = run_auto_update()
-        if code == 2:
-            LOGGER.info('Update installed; relaunching')
-            subprocess.Popen(launch_command(), close_fds=True)
-        sys.exit(code)
+        # code 2 means the detached helper will install and relaunch; exit now.
+        sys.exit(0 if code == 2 else code)
     if args.self_test_report:
         self_test(args.self_test_report)
         return

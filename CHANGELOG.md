@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.0.7] - 2026-10-20
+
+### Fixed
+
+- In-app updates aborted with installer exit code 5 because Inno Setup tried to close the running application that was waiting on it. The updater now downloads the installer, schedules it through a detached helper, exits, and lets the helper install and relaunch the app.
+
+
 ## [1.0.6] - 2026-10-20
 
 ### Added

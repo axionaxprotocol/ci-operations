@@ -2,6 +2,7 @@
 import io
 import json
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 import desktop_app
@@ -28,19 +29,26 @@ class AutoUpdateTests(unittest.TestCase):
         download.assert_not_called()
         run.assert_not_called()
 
-    def test_newer_release_downloads_and_runs_silent_installer(self):
+    def test_newer_release_downloads_and_schedules_detached_install(self):
         body = release('v99.0.0',
                        [{'name': 'CI-Operations-Setup.exe', 'browser_download_url': 'https://example.invalid/setup.exe'}])
         with patch.object(desktop_app.urllib.request, 'urlopen', return_value=body), \
              patch.object(desktop_app.urllib.request, 'urlretrieve') as download, \
+             patch.object(desktop_app.subprocess, 'Popen') as popen, \
              patch.object(desktop_app.subprocess, 'run') as run:
             self.assertEqual(desktop_app.run_auto_update(), 2)
         download.assert_called_once()
-        args = run.call_args.args[0]
-        self.assertTrue(args[0].endswith('-Setup.exe') or args[0].endswith('.exe'))
-        self.assertIn('/VERYSILENT', args)
-        self.assertIn('/NORESTART', args)
-        self.assertIn('/SUPPRESSMSGBOXES', args)
+        # The installer must not run while this process still holds its own files open.
+        run.assert_not_called()
+        popen.assert_called_once()
+        args = popen.call_args.args[0]
+        self.assertEqual(args[0], 'cmd.exe')
+        batch = Path(args[2])
+        self.assertTrue(batch.is_file(), 'detached update helper was not written')
+        script = batch.read_text(encoding='utf-8')
+        self.assertIn('/VERYSILENT', script)
+        self.assertIn('/NORESTART', script)
+        self.assertIn('/SUPPRESSMSGBOXES', script)
 
     def test_release_without_installer_asset_fails_safely(self):
         body = release('v99.0.0', [{'name': 'SHA256SUMS.txt', 'browser_download_url': 'https://example.invalid/s.txt'}])
