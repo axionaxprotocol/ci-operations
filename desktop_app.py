@@ -20,7 +20,7 @@ LOGGER = logging.getLogger('ci_operations')
 
 GITHUB_REPO = "axionaxprotocol/ci-operations"
 GITHUB_API = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "1.0.2"
+CURRENT_VERSION = "1.0.4"
 
 
 def run_auto_update() -> int:
@@ -45,9 +45,9 @@ def run_auto_update() -> int:
         LOGGER.info('Downloading installer from %s', installer_url)
         urllib.request.urlretrieve(setup_asset['browser_download_url'], installer_path)
         LOGGER.info('Running silent installer')
-        subprocess.run([installer_path, '/VERYSILENT', '/NORESTART', '/SUPPRESSMSGBOXES'], check=True, timeout=120)
+        subprocess.run([installer_path, '/VERYSILENT', '/NORESTART', '/SUPPRESSMSGBOXES'], check=True, timeout=180)
         LOGGER.info('Update applied successfully')
-        return 0
+        return 2
     except Exception as e:
         LOGGER.error('Auto-update failed: %s', e)
         return 1
@@ -87,7 +87,7 @@ def run_dashboard(settings, smoke_report=None):
     import webview
     from webview.menu import Menu, MenuAction
 
-    service = DesktopService(settings, poll=not bool(smoke_report))
+    service = DesktopService({**settings, 'app_version': CURRENT_VERSION}, poll=not bool(smoke_report))
     service.start()
     reconfigure = []
     webview.settings['OPEN_EXTERNAL_LINKS_IN_BROWSER'] = True
@@ -100,8 +100,23 @@ def run_dashboard(settings, smoke_report=None):
         reconfigure.append(True)
         window.destroy()
 
-    menu = [Menu('Application', [MenuAction('GitHub settings', configure),
-                                 MenuAction('Exit', window.destroy)])]
+    def check_updates():
+        import threading
+        def worker():
+            from tkinter import messagebox
+            code = run_auto_update()
+            if code == 0:
+                messagebox.showinfo('CI Operations', f'CI Operations {CURRENT_VERSION} is up to date.')
+            elif code == 2:
+                messagebox.showinfo('CI Operations', 'Update installed. Restart CI Operations to use the new version.')
+            elif code == 1:
+                messagebox.showinfo('CI Operations', 'Update check failed. See the diagnostic log for details.')
+        threading.Thread(target=worker, daemon=True).start()
+
+    menu = [Menu(f'Application (v{CURRENT_VERSION})',
+                 [MenuAction('Check for updates', check_updates),
+                  MenuAction('GitHub settings', configure),
+                  MenuAction('Exit', window.destroy)])]
 
     def smoke():
         outcome = {'window': False}
@@ -139,7 +154,11 @@ def main():
     configure_logging()
     args = parser.parse_args()
     if args.check_update:
-        sys.exit(run_auto_update())
+        code = run_auto_update()
+        if code == 2:
+            LOGGER.info('Update installed; relaunching')
+            subprocess.Popen(launch_command(), close_fds=True)
+        sys.exit(code)
     if args.self_test_report:
         self_test(args.self_test_report)
         return

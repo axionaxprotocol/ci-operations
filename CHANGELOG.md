@@ -6,11 +6,27 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-10-20
+
+### Changed
+
+- Auto-update now reports a distinct "update installed" result and relaunches the application after a successful silent upgrade.
+- Installer wait timeout increased to 180 seconds for slower machines.
+
+
 ### Added
 
+- In-app "Check for updates" menu action and visible version label in the dashboard footer.
 - Documentation, contribution, and security processes; MIT license.
 - Automated dependency updates and static analysis workflows.
 - Diagnostic logging that never records credentials, request headers, or exception locals.
+
+## [1.0.3] - 2026-10-20
+
+### Added
+
+- Automatic update check on startup against the latest GitHub release, with silent installer download and apply.
+- "Check for updates" item in the application menu, with the running version shown in the menu title and dashboard footer.
 
 ## [1.0.2] - 2026-10-20
 

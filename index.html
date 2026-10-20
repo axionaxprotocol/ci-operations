@@ -34,7 +34,7 @@
   </div>
   <section class="panel timeline-panel" id="activity"><div class="panel-head"><div class="panel-title"><h2>Execution timeline</h2><span class="count">60 MIN</span></div><div class="legend"><span><i class="dot good"></i>Success</span><span><i class="dot danger"></i>Failed</span><span><i class="dot warning"></i>Running</span></div></div><div class="timeline-wrap"><div id="gantt" class="timeline"></div></div></section>
   <section class="panel results-panel" id="history"><div class="panel-head"><div class="panel-title"><h2>Recent executions</h2><span id="done-count" class="count">—</span></div><span class="panel-note">Latest 25 jobs · excluding skipped</span></div><div id="done"></div></section>
-  <footer class="footer"><span id="meta">Waiting for server data</span><span id="timezone">Local time · Read-only console</span></footer>
+  <footer class="footer"><span id="meta">Waiting for server data</span><span id="app-version">Read-only console</span></footer>
  </main>
 </div>
 </div>
@@ -78,7 +78,8 @@ function render(){if(!S)return;const V=filteredState(),running=V.jobs.filter(j=>
  const recent=finished.sort((a,b)=>(stamp(b.completed)||0)-(stamp(a.completed)||0)).slice(0,25);$('done-count').textContent=recent.length;
  const resultClasses=['success','failure','timed_out','cancelled','neutral','action_required','startup_failure'];
  $('done').innerHTML=recent.length?'<div class="table-wrap"><table><thead><tr><th scope="col">RESULT</th><th scope="col">JOB / WORKFLOW</th><th scope="col">REPOSITORY</th><th scope="col">BRANCH / PR</th><th scope="col">RUNNER</th><th scope="col">DURATION</th><th scope="col">FINISHED · ICT</th></tr></thead><tbody>'+recent.map(j=>`<tr><td><span class="result ${resultClasses.includes(j.conclusion)?j.conclusion:'neutral'}"><i class="dot"></i>${esc(j.conclusion||'unknown')}</span></td><td class="job-cell">${jobLink(j)}<small>${esc(j.workflow||'—')}</small></td><td>${esc(j.repo||'—')}</td><td class="mono">${esc(j.pr?'#'+j.pr:j.branch||'—')}</td><td class="mono">${esc(j.runner||'—')}</td><td class="mono">${dur(stamp(j.completed)-stamp(j.started))}</td><td class="mono">${clock(j.completed)}</td></tr>`).join('')+'</tbody></table></div>':empty('No completed executions yet','Up to 25 jobs from the data retrieved by the server');
- $('meta').textContent='Updated '+clock(S.updated)+' '+zone+' · API remaining '+(S.rate??'—')+' · refresh 10s';
+ $('meta').textContent='Updated '+clock(S.updated)+' '+zone+' · API remaining '+(S.rate??'—');
+ $('app-version').textContent=(S.version?'v'+S.version+' · ':'')+'Read-only console';
  $('health').textContent=offline?offline+' runner(s) offline · check fleet':fleet.length?'No offline runners in the current selection':'No runner data available';
  $('health').className='health-pill '+(offline?'warning':fleet.length?'good':'neutral');
  $('err').innerHTML=S.error?'<div class="err">Data may be incomplete: '+esc(S.error)+'</div>':'';tick();

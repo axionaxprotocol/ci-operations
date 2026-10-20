@@ -81,7 +81,8 @@ class DesktopService:
         dashboard.REPOS = repos
         dashboard.POLL = max(20, int(settings.get('poll', 30)))
         dashboard.STATE.clear()
-        dashboard.STATE.update(updated=None, error='Loading data from GitHub...', runners=[], jobs=[], rate=None)
+        dashboard.STATE.update(updated=None, error='Loading data from GitHub...', runners=[], jobs=[], rate=None,
+                               version=settings.get('app_version', ''))
         dashboard._cache.clear()
         dashboard._etag.clear()
         dashboard._links.clear()
