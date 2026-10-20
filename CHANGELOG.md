@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.0.9] - 2026-10-20
+
+### Fixed
+
+- "GitHub settings" did nothing. The dashboard menu item relaunched the app with `--check-update` instead of `--configure`, so the settings form never opened and the app exited silently.
+- The settings form is now reachable while the dashboard is running: the dashboard window and the settings window use separate named locks, so a settings session is no longer refused with "CI Operations is already running".
+- Changing the token or repositories from the Start menu "GitHub Settings" shortcut now applies to the running dashboard within a few seconds instead of requiring a restart.
+- The dashboard menu opens the settings form in a separate process, so the Tk window always gets a main thread and the dashboard stays open while settings are edited.
+
+
 ## [1.0.8] - 2026-10-20
 
 ### Added

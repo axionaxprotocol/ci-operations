@@ -1,11 +1,14 @@
 """Private loopback HTTP adapter for the desktop WebView, not a LAN server."""
+import logging
 import secrets
 import threading
 from http.cookies import SimpleCookie
 from http.server import ThreadingHTTPServer
 
 import ci_dashboard as dashboard
-from desktop_store import parse_repos
+from desktop_store import SETTINGS_PATH, SettingsError, load_settings, parse_repos
+
+LOGGER = logging.getLogger('ci_operations')
 
 
 class DesktopService:
@@ -86,8 +89,17 @@ class DesktopService:
         dashboard._cache.clear()
         dashboard._etag.clear()
         dashboard._links.clear()
+        self.settings_stamp = self._settings_stamp()
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.poll_thread = threading.Thread(target=self._poll, daemon=True)
+        self.watch_thread = threading.Thread(target=self._watch, daemon=True)
+
+    @staticmethod
+    def _settings_stamp():
+        try:
+            return SETTINGS_PATH.stat().st_mtime_ns
+        except OSError:
+            return None
 
     def _poll(self):
         while not self.stop.is_set():
@@ -100,15 +112,60 @@ class DesktopService:
                 dashboard.STATE['error'] = 'GitHub connection failed. Please try again or check your token.'
             self.stop.wait(dashboard.POLL)
 
+    def apply_settings(self, settings):
+        """Adopt a new token and repository list without restarting the window."""
+        token = settings.get('token', '').strip()
+        repos = parse_repos(','.join(settings.get('repos', [])))
+        dashboard.TOKEN = token
+        dashboard.REPOS = repos
+        dashboard.POLL = max(20, int(settings.get('poll', 30)))
+        dashboard._cache.clear()
+        dashboard._etag.clear()
+        dashboard._links.clear()
+        dashboard.STATE['error'] = 'Settings updated. Loading data from GitHub...'
+        dashboard.STATE['updated'] = None
+        dashboard.STATE['runners'] = []
+        dashboard.STATE['jobs'] = []
+
+    def watch_settings(self):
+        """Reload credentials saved by a separate settings window."""
+        stamp = self._settings_stamp()
+        if stamp is None or stamp == self.settings_stamp:
+            return
+        self.settings_stamp = stamp
+        try:
+            settings = load_settings()
+        except SettingsError:
+            LOGGER.warning('saved settings could not be read while watching for changes')
+            return
+        if not settings:
+            return
+        self.apply_settings(settings)
+        LOGGER.info('applied updated credentials from the settings window')
+
+    def _watch(self):
+        while not self.stop.is_set():
+            try:
+                self.watch_settings()
+            except Exception:
+                LOGGER.warning('settings watcher failed')
+            self.stop.wait(3)
+
     def start(self):
         self.thread.start()
         if self.poll_enabled:
             self.poll_thread.start()
+        self.watch_thread.start()
 
     def close(self):
         self.stop.set()
-        self.server.shutdown()
+        # shutdown() blocks until serve_forever returns, so only call it when
+        # the server thread is actually running.
+        if self.thread.is_alive():
+            self.server.shutdown()
         self.server.server_close()
-        self.thread.join(timeout=3)
+        self.thread.join(timeout=3) if self.thread.is_alive() else None
         if self.poll_thread.is_alive():
             self.poll_thread.join(timeout=1)
+        if self.watch_thread.is_alive():
+            self.watch_thread.join(timeout=1)

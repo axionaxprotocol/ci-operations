@@ -57,6 +57,32 @@ class ServiceTests(unittest.TestCase):
         finally:
             service.close()
 
+    def test_settings_watcher_reloads_credentials_saved_elsewhere(self):
+        from unittest.mock import patch
+        service = desktop_service.DesktopService({'token': 'TEST-ONLY-NOT-REAL', 'repos': ['o/r']}, poll=False)
+        try:
+            updated = {'token': 'TEST-ONLY-NOT-REAL', 'repos': ['other/repo'], 'poll': 30}
+            with patch.object(desktop_service, 'load_settings', return_value=updated), \
+                 patch.object(service, '_settings_stamp', return_value=2):
+                service.settings_stamp = 1
+                service.watch_settings()
+            self.assertEqual(desktop_service.dashboard.REPOS, ['other/repo'])
+            self.assertEqual(desktop_service.dashboard.TOKEN, 'TEST-ONLY-NOT-REAL')
+        finally:
+            service.close()
+
+    def test_settings_watcher_ignores_unchanged_files(self):
+        from unittest.mock import patch
+        service = desktop_service.DesktopService({'token': 'TEST-ONLY-NOT-REAL', 'repos': ['o/r']}, poll=False)
+        try:
+            with patch.object(desktop_service, 'load_settings') as loader:
+                service.settings_stamp = 1
+                with patch.object(service, '_settings_stamp', return_value=1):
+                    service.watch_settings()
+            loader.assert_not_called()
+        finally:
+            service.close()
+
     def test_session_gate_and_cleanup(self):
         service = desktop_service.DesktopService({'token': 'TEST-ONLY-NOT-REAL', 'repos': ['o/r']}, poll=False)
         service.start()

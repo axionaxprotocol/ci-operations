@@ -23,7 +23,59 @@ LOGGER = logging.getLogger('ci_operations')
 
 GITHUB_REPO = "axionaxprotocol/ci-operations"
 GITHUB_API = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "1.0.8"
+CURRENT_VERSION = "1.0.9"
+
+# Two independent locks: the dashboard window and the settings window may run
+# side by side, but never twice of the same kind.
+DASHBOARD_LOCK = 'Local\\CIOperations-dashboard-'
+SETUP_LOCK = 'Local\\CIOperations-setup-'
+
+
+def lock_names():
+    """Return the kernel32 handle plus the per-user dashboard and setup lock names."""
+    kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+    kernel.CreateMutexW.argtypes = [ctypes.c_void_p, ctypes.c_bool, ctypes.c_wchar_p]
+    kernel.CreateMutexW.restype = ctypes.c_void_p
+    kernel.ReleaseMutex.argtypes = [ctypes.c_void_p]
+    kernel.CloseHandle.argtypes = [ctypes.c_void_p]
+    identity = hashlib.sha256(str(Path.home()).encode()).hexdigest()[:16]
+    return kernel, DASHBOARD_LOCK + identity, SETUP_LOCK + identity
+
+
+def acquire_mutex(kernel, name):
+    """Create a named lock. Returns None when another instance already holds it."""
+    ctypes.set_last_error(0)
+    handle = kernel.CreateMutexW(None, True, name)
+    if not handle:
+        raise OSError('Could not create application lock')
+    if ctypes.get_last_error() == 183:  # ERROR_ALREADY_EXISTS
+        kernel.CloseHandle(handle)
+        return None
+    return handle
+
+
+def release_mutex(kernel, handle):
+    if handle:
+        kernel.ReleaseMutex(handle)
+        kernel.CloseHandle(handle)
+
+
+def instance_running(kernel, name):
+    """True when another process currently holds the named lock."""
+    handle = acquire_mutex(kernel, name)
+    if handle is None:
+        return True
+    release_mutex(kernel, handle)
+    return False
+
+
+def notify(title, message):
+    """Show a native message box without leaking details into the log."""
+    from tkinter import Tk, messagebox
+    root = Tk()
+    root.withdraw()
+    messagebox.showinfo(title, message)
+    root.destroy()
 
 
 def latest_release_version():
@@ -176,16 +228,22 @@ def run_dashboard(settings, smoke_report=None):
 
     if not smoke_report:
         threading.Thread(target=update_probe, daemon=True).start()
-    reconfigure = []
     webview.settings['OPEN_EXTERNAL_LINKS_IN_BROWSER'] = True
     webview.settings['ALLOW_DOWNLOADS'] = False
     window = webview.create_window('CI Operations', service.launch_url, width=1440, height=980,
                                    min_size=(980, 680), background_color='#f4f6f8',
                                    text_select=True, zoomable=True)
 
+    current = dict(settings)
+
     def configure():
-        reconfigure.append(True)
-        window.destroy()
+        # Run the native setup form in its own process: Tk needs a main thread,
+        # and the dashboard window keeps running while settings are edited.
+        try:
+            subprocess.Popen(launch_command() + ['--configure'], close_fds=True)
+        except OSError:
+            LOGGER.warning('settings window could not be started')
+            notify('CI Operations', 'The settings window could not be opened. Use the GitHub Settings shortcut in the Start menu instead.')
 
     def check_updates():
         import threading
@@ -227,7 +285,6 @@ def run_dashboard(settings, smoke_report=None):
     finally:
         service.close()
         LOGGER.info('dashboard closed')
-    return bool(reconfigure)
 
 
 def main():
@@ -254,43 +311,56 @@ def main():
         run_dashboard({'token': 'TEST-ONLY-NOT-REAL', 'repos': ['test/fixture']}, args.ui_smoke_report)
         return
 
-    kernel = ctypes.WinDLL('kernel32', use_last_error=True)
-    kernel.CreateMutexW.argtypes = [ctypes.c_void_p, ctypes.c_bool, ctypes.c_wchar_p]
-    kernel.CreateMutexW.restype = ctypes.c_void_p
-    kernel.ReleaseMutex.argtypes = [ctypes.c_void_p]
-    kernel.CloseHandle.argtypes = [ctypes.c_void_p]
-    identity = hashlib.sha256(str(Path.home()).encode()).hexdigest()[:16]
-    mutex = kernel.CreateMutexW(None, True, 'Local\\CIOperations-' + identity)
-    if not mutex:
-        raise OSError('Could not create application lock')
-    if ctypes.get_last_error() == 183:
-        kernel.CloseHandle(mutex)
-        if not args.startup:
-            from tkinter import Tk, messagebox
-            root = Tk()
-            root.withdraw()
-            messagebox.showinfo('CI Operations', 'CI Operations is already running. Select its window on the taskbar.')
-            root.destroy()
-        return
-    reconfigure = False
+    kernel, dashboard_name, setup_name = lock_names()
+    notice = ''
     try:
-        notice = ''
+        settings = load_settings()
+    except SettingsError:
+        settings = None
+        notice = 'Could not read saved credentials. Please configure your token again.'
+        LOGGER.warning('saved settings could not be decrypted')
+
+    if args.configure:
+        # Settings-only session: it must be reachable while the dashboard runs.
+        setup_handle = acquire_mutex(kernel, setup_name)
+        if setup_handle is None:
+            if not args.startup:
+                notify('CI Operations', 'The settings window is already open.')
+            return
         try:
-            settings = load_settings()
-        except SettingsError:
-            settings = None
-            notice = 'Could not read saved credentials. Please configure your token again.'
-            LOGGER.warning('saved settings could not be decrypted')
-        if args.configure or not settings:
-            settings = show_setup(settings, notice)
-        if settings:
-            reconfigure = run_dashboard(settings)
+            updated = show_setup(settings, notice)
+        finally:
+            release_mutex(kernel, setup_handle)
+        if not updated:
+            return
+        settings = updated
+        if instance_running(kernel, dashboard_name):
+            # A dashboard is already open; it reloads the new credentials itself.
+            notify('CI Operations', 'Settings saved. The running dashboard now uses the new token and repositories.')
+            return
+
+    dashboard_handle = acquire_mutex(kernel, dashboard_name)
+    if dashboard_handle is None:
+        if not args.startup:
+            notify('CI Operations', 'CI Operations is already running. Select its window on the taskbar.')
+        return
+    try:
+        if not settings:
+            setup_handle = acquire_mutex(kernel, setup_name)
+            if setup_handle is None:
+                if not args.startup:
+                    notify('CI Operations', 'The settings window is already open.')
+                return
+            try:
+                settings = show_setup(settings, notice)
+            finally:
+                release_mutex(kernel, setup_handle)
+            if not settings:
+                return
+        run_dashboard(settings)
     finally:
-        kernel.ReleaseMutex(mutex)
-        kernel.CloseHandle(mutex)
+        release_mutex(kernel, dashboard_handle)
     LOGGER.info('application exiting')
-    if reconfigure and not args.check_update:
-        subprocess.Popen(launch_command() + ['--check-update'], close_fds=True)
 
 
 if __name__ == '__main__':
