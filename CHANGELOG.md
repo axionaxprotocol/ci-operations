@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-10-20
+
+### Fixed
+
+- The new notification checkbox made the setup form taller than its window, which clipped the **Forget credentials**, **Cancel** and **Save and open dashboard** buttons. The window is taller and the smoke test now reports the position of the action row so a clipped button fails the build instead of shipping.
+
 ## [1.2.0] - 2026-10-20
 
 ### Added

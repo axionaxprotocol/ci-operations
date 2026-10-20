@@ -2,7 +2,7 @@
 [Setup]
 AppId=CI-Operations-Desktop
 AppName=CI Operations
-AppVersion=1.2.0
+AppVersion=1.2.1
 AppPublisher=Local CI Tools
 DefaultDirName={localappdata}\Programs\CIOperations
 DefaultGroupName=CI Operations
