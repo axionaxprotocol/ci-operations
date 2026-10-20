@@ -16,6 +16,17 @@ class SetupTests(unittest.TestCase):
         source = open(setup.__file__, encoding='utf-8').read()
         self.assertIn("'notifications': notify.get()", source)
 
+    def test_the_settings_window_is_tall_enough_for_its_action_row(self):
+        """The action row must not be clipped by the bottom of the window."""
+        source = open(setup.__file__, encoding='utf-8').read()
+        self.assertIn("root.geometry('760x730')", source)
+        self.assertIn('root.minsize(720, 700)', source)
+
+    def test_the_smoke_report_detects_a_clipped_action_row(self):
+        source = open(setup.__file__, encoding='utf-8').read()
+        self.assertIn('buttons_bottom', source)
+        self.assertIn('save_button_visible', source)
+
     def test_public_first_run_does_not_prefill_private_repositories(self):
         self.assertEqual(setup.DEFAULT_REPOS, '')
 

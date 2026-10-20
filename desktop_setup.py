@@ -123,8 +123,8 @@ def show_setup(existing=None, notice='', smoke_report=None):
 
     root = tk.Tk()
     root.title('CI Operations — GitHub Setup')
-    root.geometry('760x680')
-    root.minsize(720, 650)
+    root.geometry('760x730')
+    root.minsize(720, 700)
     root.configure(bg='#f4f6f8')
     root.option_add('*Font', ('Segoe UI', 14))
     style = ttk.Style(root)
@@ -258,7 +258,10 @@ def show_setup(existing=None, notice='', smoke_report=None):
                 if 'text' in widget.keys():
                     labels.append(str(widget.cget('text')))
             english_labels = all(not 0x0E00 <= ord(c) <= 0x0E7F for text in labels for c in text)
-            Path(smoke_report).write_text(json.dumps({'native_setup': True, 'paste_verified': paste_verified, 'ctrl_v_verified': ctrl_v_verified, 'paste_button_visible': bool(paste_button.winfo_ismapped()), 'english_labels': english_labels, 'actions': [clear.cget('text'), save.cget('text')], 'masked': bool(entry.cget('show')), 'token_empty': not token.get(), 'title': root.title(), 'save_button_visible': save.winfo_rooty() + save.winfo_height() <= root.winfo_rooty() + root.winfo_height(), 'window_height': root.winfo_height()}), encoding='utf-8')
+            # The action row must sit fully inside the window, not clipped by it.
+            buttons_bottom = buttons.winfo_rooty() + buttons.winfo_height() - root.winfo_rooty()
+            save_button_visible = buttons_bottom <= root.winfo_height() - 4
+            Path(smoke_report).write_text(json.dumps({'native_setup': True, 'paste_verified': paste_verified, 'ctrl_v_verified': ctrl_v_verified, 'paste_button_visible': bool(paste_button.winfo_ismapped()), 'english_labels': english_labels, 'actions': [clear.cget('text'), save.cget('text')], 'masked': bool(entry.cget('show')), 'token_empty': not token.get(), 'title': root.title(), 'save_button_visible': save_button_visible, 'buttons_bottom': buttons_bottom, 'window_height': root.winfo_height()}), encoding='utf-8')
             root.destroy()
         root.after(1200, report)
     root.mainloop()
