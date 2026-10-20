@@ -169,6 +169,16 @@ test('failed history request does not break the dashboard',async()=>{
  assert.ok(p.element('reliability-metrics').innerHTML.includes('Success rate'));
  assert.ok(p.element('failing-steps').innerHTML.includes('No failing steps recorded'));
 });
+test('footer shows the current poll interval so a backoff is visible',async()=>{
+ const p=page({runners:[],jobs:[],rate:'4500',poll_interval:30});
+ await vm.runInContext('load()',p.context);
+ assert.match(p.element('meta').textContent,/polling every 30s/);
+});
+test('footer hides the poll interval when it is unknown',async()=>{
+ const p=page({runners:[],jobs:[],rate:'4500'});
+ await vm.runInContext('load()',p.context);
+ assert.doesNotMatch(p.element('meta').textContent,/polling every/);
+});
 test('failed refresh is visible and keeps previously rendered content', async()=>{
   const p=page({runners:[],jobs:[]});
   await vm.runInContext('load()',p.context);

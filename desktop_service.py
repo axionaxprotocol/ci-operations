@@ -17,6 +17,36 @@ HISTORY_PATH = DATA_DIR / 'history.db'
 HISTORY_WINDOWS = {'24h': 24 * 3600, '7d': 7 * 24 * 3600, '30d': 30 * 24 * 3600, 'all': 0}
 HISTORY_PAGE_LIMIT = 50
 
+BASE_POLL_SECONDS = 30
+MIN_POLL_SECONDS = 20
+MAX_POLL_SECONDS = 300
+RATE_LIMIT_FLOOR = 200      # below this many requests left, back off hard
+RATE_LIMIT_SOFT = 1000      # below this, back off moderately
+
+
+def poll_interval(rate_remaining=None, running=False):
+    """Return how many seconds to wait before the next poll.
+
+    The collector reads X-RateLimit-Remaining on every response. Polling faster
+    while a job is running keeps the dashboard live, but the interval has to grow
+    when the request budget is nearly spent or GitHub will start refusing calls.
+    """
+    try:
+        remaining = int(rate_remaining)
+    except (TypeError, ValueError):
+        remaining = None
+    if remaining is None:
+        interval = BASE_POLL_SECONDS
+    elif remaining <= RATE_LIMIT_FLOOR:
+        interval = MAX_POLL_SECONDS
+    elif remaining < RATE_LIMIT_SOFT:
+        interval = 120
+    else:
+        interval = BASE_POLL_SECONDS
+    if running and interval > MIN_POLL_SECONDS and (remaining is None or remaining >= RATE_LIMIT_SOFT):
+        interval = MIN_POLL_SECONDS
+    return max(MIN_POLL_SECONDS, min(MAX_POLL_SECONDS, interval))
+
 
 def _window_seconds(value):
     """Translate a history window name into seconds. Unknown values mean everything."""
@@ -164,7 +194,10 @@ class DesktopService:
             except Exception:
                 # Never include exception repr, request headers or credentials in the UI.
                 dashboard.STATE['error'] = 'GitHub connection failed. Please try again or check your token.'
-            self.stop.wait(dashboard.POLL)
+            running = any(job.get('status') == 'in_progress' for job in (dashboard.STATE.get('jobs') or []))
+            interval = poll_interval(dashboard.STATE.get('rate'), running=running)
+            dashboard.STATE['poll_interval'] = interval
+            self.stop.wait(interval)
 
     def record_history(self):
         """Persist finished jobs so reliability trends survive a restart."""
