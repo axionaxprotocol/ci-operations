@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.0.11] - 2026-10-20
+
+### Fixed
+
+- Version comparison used raw string ordering, so `1.0.10` was treated as older than `1.0.9` and the auto-update never offered it. Versions are now compared numerically in the updater, the startup probe, and the dashboard footer.
+- The settings integration test no longer depends on a settings file or a running application on the machine executing it.
+
+
 ## [1.0.10] - 2026-10-20
 
 ### Fixed

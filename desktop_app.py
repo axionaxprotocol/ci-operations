@@ -23,7 +23,7 @@ LOGGER = logging.getLogger('ci_operations')
 
 GITHUB_REPO = "axionaxprotocol/ci-operations"
 GITHUB_API = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "1.0.10"
+CURRENT_VERSION = "1.0.11"
 
 # Two independent locks: the dashboard window and the settings window may run
 # side by side, but never twice of the same kind.
@@ -76,6 +76,23 @@ def notify(title, message):
     root.withdraw()
     messagebox.showinfo(title, message)
     root.destroy()
+
+
+def parse_version(value):
+    """Return a comparable tuple for a dotted version string."""
+    parts = []
+    for chunk in str(value).split('.'):
+        digits = ''.join(c for c in chunk if c.isdigit())
+        parts.append(int(digits) if digits else 0)
+    return tuple(parts)
+
+
+def version_is_newer(candidate, current):
+    """True when candidate is a strictly newer version than current.
+
+    Comparing the raw strings is wrong: '1.0.10' sorts before '1.0.9'.
+    """
+    return parse_version(candidate) > parse_version(current)
 
 
 def latest_release_version():
@@ -146,7 +163,7 @@ def run_auto_update() -> int:
             LOGGER.info('No installer asset found in latest release')
             return 1
         latest_version = tag.lstrip('v')
-        if latest_version <= CURRENT_VERSION:
+        if not version_is_newer(latest_version, CURRENT_VERSION):
             LOGGER.info('Already on latest version %s', CURRENT_VERSION)
             return 0
         LOGGER.info('Update available: %s -> %s', CURRENT_VERSION, latest_version)
@@ -223,7 +240,7 @@ def run_dashboard(settings, smoke_report=None):
         if version:
             import desktop_service
             desktop_service.dashboard.STATE['latest_version'] = version
-            if version > CURRENT_VERSION:
+            if version_is_newer(version, CURRENT_VERSION):
                 LOGGER.info('Newer release available: %s', version)
 
     if not smoke_report:

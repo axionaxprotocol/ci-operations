@@ -98,6 +98,25 @@ class AutoUpdateTests(unittest.TestCase):
             self.assertIsNone(desktop_app.latest_release_version())
 
 
+class VersionComparisonTests(unittest.TestCase):
+    def test_two_digit_minor_is_newer_than_single_digit(self):
+        # '1.0.10' sorts before '1.0.9' as a string, so raw comparison is wrong.
+        self.assertTrue(desktop_app.version_is_newer('1.0.10', '1.0.9'))
+
+    def test_older_and_equal_versions_are_not_newer(self):
+        self.assertFalse(desktop_app.version_is_newer('1.0.9', '1.0.10'))
+        self.assertFalse(desktop_app.version_is_newer('1.0.10', '1.0.10'))
+
+    def test_patch_and_major_differences(self):
+        self.assertTrue(desktop_app.version_is_newer('1.0.11', '1.0.10'))
+        self.assertTrue(desktop_app.version_is_newer('2.0.0', '1.9.9'))
+        self.assertFalse(desktop_app.version_is_newer('1.9.9', '2.0.0'))
+
+    def test_prefixed_and_missing_parts_are_tolerated(self):
+        self.assertTrue(desktop_app.version_is_newer('v1.1', '1.0.9'))
+        self.assertFalse(desktop_app.version_is_newer('1.0', '1.0.0'))
+
+
 class ChecksumHelperTests(unittest.TestCase):
     def test_parse_sums_finds_matching_entry(self):
         other = 'a' * 64

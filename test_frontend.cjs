@@ -85,6 +85,11 @@ test('footer advertises a newer release when one is detected',async()=>{
  assert.match(p.element('app-version').textContent,/Update available: v1\.0\.6/);
  assert.match(p.element('app-version').textContent,/v1\.0\.5/);
 });
+test('footer treats a two-digit minor as newer',async()=>{
+ const p=page({runners:[],jobs:[],version:'1.0.9',latest_version:'1.0.10'});
+ await vm.runInContext('load()',p.context);
+ assert.match(p.element('app-version').textContent,/Update available: v1\.0\.10/);
+});
 test('footer does not advertise an update when versions match',async()=>{
  const p=page({runners:[],jobs:[],version:'1.0.6',latest_version:'1.0.6'});
  await vm.runInContext('load()',p.context);

@@ -22,7 +22,12 @@ ROOT = Path(__file__).resolve().parent
 
 class SettingsWindowIntegrationTests(unittest.TestCase):
     def setUp(self):
-        self.kernel, self.dashboard_name, self.setup_name = desktop_app.lock_names()
+        self.kernel, _, _ = desktop_app.lock_names()
+        # Use a per-run suffix so a live CI Operations instance on this machine
+        # cannot block the test, while the real lock helpers are still exercised.
+        self.suffix = f'{os.getpid()}-{id(self)}'
+        self.dashboard_name = desktop_app.DASHBOARD_LOCK + self.suffix
+        self.setup_name = desktop_app.SETUP_LOCK + self.suffix
         self.dashboard_handle = desktop_app.acquire_mutex(self.kernel, self.dashboard_name)
         self.assertIsNotNone(self.dashboard_handle, 'the dashboard lock must be acquirable')
         self.addCleanup(desktop_app.release_mutex, self.kernel, self.dashboard_handle)
