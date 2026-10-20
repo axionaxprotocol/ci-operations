@@ -1,9 +1,12 @@
 import http.client
 import json
+import tempfile
 import unittest
 import urllib.error
 import urllib.request
+from pathlib import Path
 
+import desktop_history
 import desktop_service
 
 
@@ -110,6 +113,11 @@ class ServiceTests(unittest.TestCase):
 
     def test_history_endpoint_returns_a_summary_and_the_stored_jobs(self):
         service = desktop_service.DesktopService({'token': 'TEST-ONLY-NOT-REAL', 'repos': ['o/r']}, poll=False)
+        # Use an isolated store so the machine's real history cannot change the result.
+        isolated = tempfile.TemporaryDirectory()
+        self.addCleanup(isolated.cleanup)
+        service.history = desktop_history.HistoryStore(Path(isolated.name) / 'history.db')
+        self.addCleanup(service.history.close)
         service.start()
         try:
             service.history.record([{
