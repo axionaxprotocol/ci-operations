@@ -1,14 +1,51 @@
 """Private loopback HTTP adapter for the desktop WebView, not a LAN server."""
+import json
 import logging
 import secrets
 import threading
+import time
 from http.cookies import SimpleCookie
 from http.server import ThreadingHTTPServer
 
 import ci_dashboard as dashboard
-from desktop_store import SETTINGS_PATH, SettingsError, load_settings, parse_repos
+from desktop_history import load_store
+from desktop_store import DATA_DIR, SETTINGS_PATH, SettingsError, load_settings, parse_repos
 
 LOGGER = logging.getLogger('ci_operations')
+
+HISTORY_PATH = DATA_DIR / 'history.db'
+HISTORY_WINDOWS = {'24h': 24 * 3600, '7d': 7 * 24 * 3600, '30d': 30 * 24 * 3600, 'all': 0}
+
+
+def _window_seconds(value):
+    """Translate a history window name into seconds. Unknown values mean everything."""
+    try:
+        return HISTORY_WINDOWS.get(str(value or '').lower(), 0)
+    except (AttributeError, TypeError):
+        return 0
+
+
+def _drain(handler):
+    """Read and discard the request body so the socket closes cleanly."""
+    try:
+        length = int(handler.headers.get('Content-Length') or 0)
+    except (TypeError, ValueError):
+        length = 0
+    if length > 0:
+        try:
+            handler.rfile.read(min(length, 1 << 20))
+        except OSError:
+            pass
+
+
+def _query_window(path):
+    """Read the history window from a query string."""
+    try:
+        from urllib.parse import parse_qs, urlsplit
+        values = parse_qs(urlsplit(path).query).get('window', [])
+        return values[0] if values else ''
+    except (AttributeError, TypeError, ValueError):
+        return ''
 
 
 class DesktopService:
@@ -23,10 +60,14 @@ class DesktopService:
         # Session secret used only to set the HttpOnly cookie; never exposed to the page.
         self.session_value = ''
         self.poll_enabled = poll
+        self.history = load_store(HISTORY_PATH, enabled=settings.get('history', True) is not False)
         owner = self
 
         class GuardedHandler(dashboard.H):
             def do_POST(self):
+                # Drain the request body before replying, otherwise closing the
+                # socket with unread data makes Windows reset the connection.
+                _drain(self)
                 self.send_error(405)
 
             do_PUT = do_DELETE = do_PATCH = do_OPTIONS = do_POST
@@ -72,6 +113,17 @@ class DesktopService:
                 if not valid:
                     self.send_error(401)
                     return
+                history = owner.history_payload(self.path, self.headers)
+                if history is not None:
+                    body, content_type = history
+                    self.send_response(200)
+                    self.send_header('Content-Type', content_type)
+                    self.send_header('Content-Length', str(len(body)))
+                    self.send_header('Cache-Control', 'no-store')
+                    self.send_header('X-Content-Type-Options', 'nosniff')
+                    self.end_headers()
+                    self.wfile.write(body)
+                    return
                 super().do_GET()
 
         self.server = ThreadingHTTPServer(('127.0.0.1', 0), GuardedHandler)
@@ -107,10 +159,38 @@ class DesktopService:
                 dashboard.poll_once()
                 if dashboard.STATE.get('error'):
                     dashboard.STATE['error'] = 'GitHub data is incomplete or unavailable. Check your connection and token permissions (Actions/Administration: Read).'
+                self.record_history()
             except Exception:
                 # Never include exception repr, request headers or credentials in the UI.
                 dashboard.STATE['error'] = 'GitHub connection failed. Please try again or check your token.'
             self.stop.wait(dashboard.POLL)
+
+    def record_history(self):
+        """Persist finished jobs so reliability trends survive a restart."""
+        if self.history is None:
+            return 0
+        try:
+            return self.history.record(dashboard.STATE.get('jobs') or [])
+        except Exception:
+            LOGGER.warning('job history could not be written')
+            return 0
+
+    def history_payload(self, path, headers):
+        """Return the body for a history route, or None when the route is unknown."""
+        route = path.split('?', 1)[0]
+        if route not in ('/api/history', '/api/history.csv'):
+            return None
+        if self.history is None:
+            return json.dumps({'error': 'History is disabled.'}).encode(), 'application/json'
+        window = _window_seconds(headers.get('X-History-Window') or _query_window(path))
+        since = time.time() - window if window else None
+        if route == '/api/history.csv':
+            return self.history.export_csv(since=since).encode('utf-8'), 'text/csv; charset=utf-8'
+        body = json.dumps({
+            'summary': self.reliability(window),
+            'jobs': self.history.export_json(since=since)['jobs'],
+        }).encode('utf-8')
+        return body, 'application/json'
 
     def apply_settings(self, settings):
         """Adopt a new token and repository list without restarting the window."""
@@ -126,6 +206,19 @@ class DesktopService:
         dashboard.STATE['updated'] = None
         dashboard.STATE['runners'] = []
         dashboard.STATE['jobs'] = []
+
+    def reliability(self, window='24h'):
+        """Return the reliability summary for the requested window."""
+        if self.history is None:
+            return {'total': 0, 'failed': 0, 'successes': 0, 'success_rate': None,
+                    'workflows': [], 'failing_steps': []}
+        since = time.time() - _window_seconds(window) if _window_seconds(window) else None
+        try:
+            return self.history.summary(since=since)
+        except Exception:
+            LOGGER.warning('reliability summary could not be computed')
+            return {'total': 0, 'failed': 0, 'successes': 0, 'success_rate': None,
+                    'workflows': [], 'failing_steps': []}
 
     def watch_settings(self):
         """Reload credentials saved by a separate settings window."""

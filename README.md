@@ -16,6 +16,9 @@ A local Windows desktop console for monitoring GitHub Actions runners and jobs. 
 - Remember settings using Windows DPAPI, bound to the current Windows account.
 - Optional launch at Windows sign-in; off until explicitly selected.
 - Runner fleet, active executions, pending jobs, repository health, a 60-minute execution timeline, and recent job results.
+- Durable local job history in SQLite, so reliability data survives restarts. Stored at `%LOCALAPPDATA%\CIOperations\history.db` and never uploaded.
+- A Reliability panel with success rate, failure count, median and 95th-percentile duration, and the steps that fail most often.
+- History windows of 24 hours, 7 days, 30 days, or everything stored, plus CSV export of the selected window.
 - Repository filtering and search, English application text, light theme, and 14px minimum dashboard text.
 - Private WebView2 window backed by a loopback-only server on a random port with a session gate.
 - An optional standard-library-only web server for development or local browser use.
@@ -120,6 +123,8 @@ For snapshot mode, set `STATE_FILE` to a JSON file containing `runners` and `job
 - **Observed success**: successful completed jobs divided by all completed jobs retrieved for the selection, excluding skipped jobs but including cancelled/neutral jobs. It is not an SLA or a complete daily statistic.
 - **Repository health**: runner availability and active/failed jobs in the retrieved data. Failed includes failure, timed_out, action_required, and startup_failure.
 - **Execution timeline**: jobs with runner names and valid start times within the last 60 minutes; overlapping executions use separate tracks.
+- **Reliability**: success rate, failure count, median duration, and 95th-percentile duration over the locally stored history for the selected window. This covers only jobs seen while the app was running, so it is not a complete historical record of the repository.
+- **Most frequent failing steps**: the steps GitHub reported as failed, ranked by how often they broke. Steps are only recorded for jobs the app observed.
 
 Connection failures, incomplete API data, and stale data are shown separately from offline runner status. Data older than 90 seconds is marked stale. The collector retrieves active workflows plus recently created runs; this is not a complete historical archive.
 
@@ -165,6 +170,7 @@ These modes exercise credential encryption, native setup controls, bundled resou
 | `desktop_setup.py` | Native setup, validation, paste support, optional startup |
 | `desktop_store.py` | Current-user DPAPI encrypted settings |
 | `desktop_service.py` | Session-gated loopback adapter |
+| `desktop_history.py` | Local SQLite history of finished jobs and their steps |
 | `build_desktop.py`, `installer.iss` | Windows application and installer packaging |
 
 ## License

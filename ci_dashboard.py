@@ -73,6 +73,16 @@ def poll_once():
             error.close()
 
 
+def _steps(job):
+    """Normalise the steps of a job, keeping only fields the dashboard uses."""
+    steps = []
+    for step in job.get("steps") or []:
+        steps.append({"name": step.get("name"), "conclusion": step.get("conclusion"),
+                      "number": step.get("number"), "started": step.get("started_at"),
+                      "completed": step.get("completed_at")})
+    return steps
+
+
 def _collect():
     runners, jobs, errs = [], [], []
     since = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - 3 * 3600))
@@ -99,11 +109,13 @@ def _collect():
                 raise
             pr = run.get("pull_requests") or []
             for j in js:
-                jobs.append({"repo": repo, "run_id": run["id"], "workflow": run["name"], "branch": run["head_branch"],
+                jobs.append({"repo": repo, "run_id": run["id"], "job_id": j.get("id"),
+                             "workflow": run["name"], "branch": run["head_branch"],
                              "pr": pr[0]["number"] if pr else None, "sha": run["head_sha"][:7], "name": j["name"],
                              "status": j["status"], "conclusion": j["conclusion"], "runner": j.get("runner_name"),
                              "created": j.get("created_at"), "started": j.get("started_at"),
-                             "completed": j.get("completed_at"), "url": j.get("html_url")})
+                             "completed": j.get("completed_at"), "url": j.get("html_url"),
+                             "steps": _steps(j)})
     STATE.update(updated=datetime.now(timezone.utc).isoformat(), error="; ".join(errs) or None,
                  runners=runners, jobs=jobs)
 

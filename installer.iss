@@ -37,6 +37,7 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueName: 
 [UninstallDelete]
 Type: files; Name: "{localappdata}\CIOperations\settings.dat"
 Type: files; Name: "{localappdata}\CIOperations\settings.tmp"
+Type: files; Name: "{localappdata}\CIOperations\history.db"
 
 [Code]
 function ValidRuntimeVersion(RootKey: Integer; const Key: String): Boolean;

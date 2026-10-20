@@ -34,7 +34,7 @@ Issues = "https://github.com/axionaxprotocol/ci-operations/issues"
 Changelog = "https://github.com/axionaxprotocol/ci-operations/blob/main/CHANGELOG.md"
 
 [tool.setuptools]
-py-modules = ["ci_dashboard", "desktop_app", "desktop_service", "desktop_setup", "desktop_store"]
+py-modules = ["ci_dashboard", "desktop_app", "desktop_history", "desktop_service", "desktop_setup", "desktop_store"]
 
 [tool.ruff]
 line-length = 120

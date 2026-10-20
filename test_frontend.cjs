@@ -4,15 +4,26 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const html = fs.readFileSync('index.html', 'utf8');
 const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
-function page(state) {
+function page(state, history) {
   const elements = new Map();
   const element = id => {
     if (!elements.has(id)) elements.set(id, {innerHTML:'', textContent:'', value:'', dataset:{}, addEventListener(){}, disabled:false});
     return elements.get(id);
   };
-  const context = vm.createContext({document:{getElementById:element,querySelectorAll:()=>[]},window:{},Date,Map,Set,URL,AbortSignal,setInterval(){},setTimeout(){},clearTimeout(){},fetch:async()=>({ok:true,json:async()=>state})});
+  const created = [];
+  const document = {
+    getElementById: element,
+    querySelectorAll: () => [],
+    createElement: tag => {const node = {tag, click(){}, remove(){}}; created.push(node); return node;},
+    body: {appendChild(){}, removeChild(){}},
+  };
+  const context = vm.createContext({document,window:{},Date,Map,Set,URL,AbortSignal,encodeURIComponent,setInterval(){},setTimeout(){},clearTimeout(){},
+    fetch:async(url,options)=>{
+      if (url === '/api/history') return {ok:true,json:async()=>history||{summary:{total:0,failed:0,successes:0,success_rate:null,workflows:[],failing_steps:[]},jobs:[]}};
+      return {ok:true,json:async()=>state};
+    }});
   vm.runInContext(script.replace(/;load\(\);setInterval/, ';setInterval'), context);
-  return {context, element};
+  return {context, element, created};
 }
 test('timestamps follow the viewer timezone instead of a hardcoded one',()=>{
  assert.ok(!html.includes('Asia/Bangkok'));
@@ -37,9 +48,14 @@ test('console defaults to a light color scheme',()=>{
 });
 test('session gate rejects methods that could mutate or echo state',()=>{
  const source=fs.readFileSync('desktop_service.py','utf8');
- assert.match(source,/def do_POST\(self\):\s*self\.send_error\(405\)/);
+ assert.match(source,/def do_POST\(self\):[\s\S]*?self\.send_error\(405\)/);
  assert.match(source,/class GuardedHandler\(dashboard\.H\)/);
  assert.match(source,/if self\.command != 'GET':/);
+});
+test('rejected requests drain the body so the socket closes cleanly',()=>{
+ const source=fs.readFileSync('desktop_service.py','utf8');
+ assert.match(source,/_drain\(self\)/);
+ assert.match(source,/def _drain\(handler\):/);
 });
 test('untrusted names and links cannot inject HTML', async()=>{
   const p = page({runners:[{name:'<img src=x onerror=alert(1)>',repo:'o/r',status:'online'}],jobs:[{repo:'o/r',name:'<script>bad<script>',status:'queued',created:null,url:'javascript:alert(1)'}],error:'<img src=x>',updated:null});
@@ -99,6 +115,59 @@ test('missing timestamps render a dash rather than NaN',async()=>{
  const p=page({runners:[],jobs:[{name:'waiting',repo:'o/a',status:'queued',created:null}]});
  await vm.runInContext('load()',p.context);
  assert.equal(vm.runInContext('dur(NaN)',p.context),'—');
+});
+test('reliability panel shows the stored success rate',async()=>{
+ const p=page({runners:[],jobs:[]},{summary:{total:20,failed:2,successes:18,success_rate:90,median_duration_ms:120000,p95_duration_ms:300000,workflows:[],failing_steps:[]},jobs:[]});
+ await vm.runInContext('loadHistory()',p.context);
+ const view=p.element('reliability-metrics').innerHTML;
+ assert.ok(view.includes('Success rate'));
+ assert.ok(view.includes('90%'));
+ assert.ok(view.includes('2m 0s'));
+});
+test('reliability panel lists the most frequent failing steps',async()=>{
+ const p=page({runners:[],jobs:[]},{summary:{total:5,failed:3,successes:2,success_rate:40,workflows:[],failing_steps:[{step:'npm install',failed:2},{step:'pytest',failed:1}]},jobs:[]});
+ await vm.runInContext('loadHistory()',p.context);
+ const view=p.element('failing-steps').innerHTML;
+ assert.ok(view.includes('npm install'));
+ assert.ok(view.includes('2 failed'));
+ assert.ok(view.includes('pytest'));
+});
+test('failing step names are escaped',async()=>{
+ const p=page({runners:[],jobs:[]},{summary:{total:1,failed:1,successes:0,success_rate:0,workflows:[],failing_steps:[{step:'<img src=x onerror=alert(1)>',failed:1}]},jobs:[]});
+ await vm.runInContext('loadHistory()',p.context);
+ const view=p.element('failing-steps').innerHTML;
+ assert.ok(!view.includes('<img'));
+ assert.ok(view.includes('&lt;img'));
+});
+test('reliability window label follows the selected window',async()=>{
+ const p=page({runners:[],jobs:[]});
+ p.element('window').value='7d';
+ await vm.runInContext('loadHistory()',p.context);
+ assert.equal(p.element('reliability-window').textContent,'7D');
+});
+test('export button requests a CSV download for the selected window',async()=>{
+ const p=page({runners:[],jobs:[]});
+ p.element('window').value='30d';
+ vm.runInContext('exportHistory()',p.context);
+ assert.equal(p.created.length,1);
+ assert.match(p.created[0].href,/\/api\/history\.csv\?window=30d/);
+ assert.match(p.created[0].download,/ci-operations-history-30d\.csv/);
+});
+test('history endpoint is requested with the selected window',async()=>{
+ const p=page({runners:[],jobs:[]});
+ let requested=null;
+ p.context.fetch=async(url,options)=>{requested={url,options};return {ok:true,json:async()=>({summary:{total:0,failed:0,successes:0,success_rate:null,workflows:[],failing_steps:[]},jobs:[]})};};
+ p.element('window').value='7d';
+ await vm.runInContext('loadHistory()',p.context);
+ assert.equal(requested.url,'/api/history');
+ assert.equal(requested.options.headers['X-History-Window'],'7d');
+});
+test('failed history request does not break the dashboard',async()=>{
+ const p=page({runners:[],jobs:[]});
+ p.context.fetch=async()=>{throw Error('offline');};
+ await vm.runInContext('loadHistory()',p.context);
+ assert.ok(p.element('reliability-metrics').innerHTML.includes('Success rate'));
+ assert.ok(p.element('failing-steps').innerHTML.includes('No failing steps recorded'));
 });
 test('failed refresh is visible and keeps previously rendered content', async()=>{
   const p=page({runners:[],jobs:[]});

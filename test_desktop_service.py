@@ -1,3 +1,4 @@
+import http.client
 import json
 import unittest
 import urllib.error
@@ -95,6 +96,74 @@ class ServiceTests(unittest.TestCase):
             self.assertIn('removed', desktop_service.dashboard.STATE['error'])
         finally:
             service.close()
+
+    def test_history_endpoint_requires_the_session_cookie(self):
+        service = desktop_service.DesktopService({'token': 'TEST-ONLY-NOT-REAL', 'repos': ['o/r']}, poll=False)
+        service.start()
+        try:
+            with self.assertRaises(urllib.error.HTTPError) as caught:
+                urllib.request.urlopen(service.origin + '/api/history')
+            self.assertEqual(caught.exception.code, 401)
+            caught.exception.close()
+        finally:
+            service.close()
+
+    def test_history_endpoint_returns_a_summary_and_the_stored_jobs(self):
+        service = desktop_service.DesktopService({'token': 'TEST-ONLY-NOT-REAL', 'repos': ['o/r']}, poll=False)
+        service.start()
+        try:
+            service.history.record([{
+                'repo': 'o/r', 'run_id': 1, 'job_id': 5, 'name': 'build', 'workflow': 'CI',
+                'status': 'completed', 'conclusion': 'success', 'started': '2026-10-20T10:00:00Z',
+                'completed': '2026-10-20T10:01:00Z', 'steps': []}])
+            opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor())
+            with opener.open(service.launch_url) as response:
+                response.read()
+            with opener.open(service.origin + '/api/history') as response:
+                data = json.load(response)
+            self.assertEqual(data['summary']['total'], 1)
+            self.assertEqual(data['summary']['success_rate'], 100)
+            self.assertEqual(len(data['jobs']), 1)
+            self.assertEqual(data['jobs'][0]['workflow'], 'CI')
+        finally:
+            service.close()
+
+    def test_history_csv_endpoint_returns_csv_text(self):
+        service = desktop_service.DesktopService({'token': 'TEST-ONLY-NOT-REAL', 'repos': ['o/r']}, poll=False)
+        service.start()
+        try:
+            opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor())
+            with opener.open(service.launch_url) as response:
+                response.read()
+            with opener.open(service.origin + '/api/history.csv') as response:
+                body = response.read().decode('utf-8')
+            self.assertTrue(body.startswith('repo,workflow,job'))
+        finally:
+            service.close()
+
+    def test_history_window_header_selects_the_recorded_period(self):
+        self.assertEqual(desktop_service._window_seconds('24h'), 24 * 3600)
+        self.assertEqual(desktop_service._window_seconds('7d'), 7 * 24 * 3600)
+        self.assertEqual(desktop_service._window_seconds('all'), 0)
+        self.assertEqual(desktop_service._window_seconds('nonsense'), 0)
+
+    def test_history_query_window_is_read_from_the_url(self):
+        self.assertEqual(desktop_service._query_window('/api/history.csv?window=30d'), '30d')
+        self.assertEqual(desktop_service._query_window('/api/history'), '')
+
+    def test_history_endpoints_reject_mutating_methods(self):
+        service = desktop_service.DesktopService({'token': 'TEST-ONLY-NOT-REAL', 'repos': ['o/r']}, poll=False)
+        service.start()
+        try:
+            connection = http.client.HTTPConnection('127.0.0.1', service.server.server_port, timeout=5)
+            connection.request('POST', '/api/history', body='x')
+            response = connection.getresponse()
+            response.read()
+            self.assertEqual(response.status, 405)
+            connection.close()
+        finally:
+            service.close()
+
 
     def test_session_gate_and_cleanup(self):
         service = desktop_service.DesktopService({'token': 'TEST-ONLY-NOT-REAL', 'repos': ['o/r']}, poll=False)
