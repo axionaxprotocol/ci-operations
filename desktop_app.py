@@ -9,6 +9,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -22,7 +23,21 @@ LOGGER = logging.getLogger('ci_operations')
 
 GITHUB_REPO = "axionaxprotocol/ci-operations"
 GITHUB_API = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-CURRENT_VERSION = "1.0.5"
+CURRENT_VERSION = "1.0.6"
+
+
+def latest_release_version():
+    """Return the newest published release version, or None if it cannot be read."""
+    import json
+    try:
+        with urllib.request.urlopen(GITHUB_API, timeout=8) as resp:
+            data = json.load(resp)
+        tag = data.get('tag_name') or ''
+        version = tag.lstrip('v').strip()
+        return version or None
+    except Exception as e:
+        LOGGER.info('Release lookup failed: %s', e)
+        return None
 
 
 def run_auto_update() -> int:
@@ -91,6 +106,17 @@ def run_dashboard(settings, smoke_report=None):
 
     service = DesktopService({**settings, 'app_version': CURRENT_VERSION}, poll=not bool(smoke_report))
     service.start()
+
+    def update_probe():
+        version = latest_release_version()
+        if version:
+            import desktop_service
+            desktop_service.dashboard.STATE['latest_version'] = version
+            if version > CURRENT_VERSION:
+                LOGGER.info('Newer release available: %s', version)
+
+    if not smoke_report:
+        threading.Thread(target=update_probe, daemon=True).start()
     reconfigure = []
     webview.settings['OPEN_EXTERNAL_LINKS_IN_BROWSER'] = True
     webview.settings['ALLOW_DOWNLOADS'] = False

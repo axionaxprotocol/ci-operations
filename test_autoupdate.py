@@ -54,6 +54,16 @@ class AutoUpdateTests(unittest.TestCase):
                           side_effect=desktop_app.urllib.error.URLError('offline')):
             self.assertEqual(desktop_app.run_auto_update(), 1)
 
+    def test_latest_release_version_returns_tag_without_prefix(self):
+        body = release('v9.9.9', [{'name': 'CI-Operations-Setup.exe', 'browser_download_url': 'https://x.invalid/a.exe'}])
+        with patch.object(desktop_app.urllib.request, 'urlopen', return_value=body):
+            self.assertEqual(desktop_app.latest_release_version(), '9.9.9')
+
+    def test_latest_release_version_returns_none_on_failure(self):
+        with patch.object(desktop_app.urllib.request, 'urlopen',
+                          side_effect=desktop_app.urllib.error.URLError('offline')):
+            self.assertIsNone(desktop_app.latest_release_version())
+
 
 if __name__ == '__main__':
     unittest.main()

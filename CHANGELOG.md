@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.0.6] - 2026-10-20
+
+### Added
+
+- Background release check at startup; the dashboard footer now shows "Update available: vX.Y.Z" when a newer release exists.
+- `latest_release_version()` helper with tests covering success, failure, and no-update cases.
+
+
 ## [1.0.5] - 2026-10-20
 
 ### Fixed

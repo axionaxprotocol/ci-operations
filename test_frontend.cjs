@@ -79,6 +79,17 @@ test('repository health separates counts by repository',async()=>{
  assert.ok(p.element('repo-health').innerHTML.includes('o/b'));
  assert.ok(p.element('repo-health').innerHTML.includes('1 failed'));
 });
+test('footer advertises a newer release when one is detected',async()=>{
+ const p=page({runners:[],jobs:[],version:'1.0.5',latest_version:'1.0.6'});
+ await vm.runInContext('load()',p.context);
+ assert.match(p.element('app-version').textContent,/Update available: v1\.0\.6/);
+ assert.match(p.element('app-version').textContent,/v1\.0\.5/);
+});
+test('footer does not advertise an update when versions match',async()=>{
+ const p=page({runners:[],jobs:[],version:'1.0.6',latest_version:'1.0.6'});
+ await vm.runInContext('load()',p.context);
+ assert.doesNotMatch(p.element('app-version').textContent,/Update available/);
+});
 test('missing timestamps render a dash rather than NaN',async()=>{
  const p=page({runners:[],jobs:[{name:'waiting',repo:'o/a',status:'queued',created:null}]});
  await vm.runInContext('load()',p.context);
