@@ -1,0 +1,44 @@
+# Changelog
+
+All notable changes to this project are documented here. The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added
+
+- Documentation, contribution, and security processes; MIT license.
+- Automated dependency updates and static analysis workflows.
+- Diagnostic logging that never records credentials, request headers, or exception locals.
+
+## [1.0.2] - 2026-10-20
+
+### Added
+
+- Native Paste button, right-click Paste menu, and layout-independent Ctrl+V support for the token field.
+- Workflow and PowerShell helpers for building, testing, and packaging locally.
+
+### Changed
+
+- English-only application interface, light theme, and 14px minimum dashboard text.
+- Timestamps follow the viewer's system timezone instead of a hardcoded zone.
+- Shared source no longer contains private repository defaults.
+
+### Fixed
+
+- Session cookie comparisons reject malformed input with a clean 401 response.
+- Authorization headers are not forwarded across HTTP redirects.
+
+## [1.0.1] - 2026-10-20
+
+### Changed
+
+- English-native setup form, menus, and error messages.
+
+## [1.0.0] - 2026-10-20
+
+### Added
+
+- Loopback-only operations dashboard for GitHub Actions runners, pending jobs, and recent executions.
+- Windows desktop application with Windows DPAPI-protected settings, optional startup, and a per-user installer.

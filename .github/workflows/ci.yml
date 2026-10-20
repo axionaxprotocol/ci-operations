@@ -9,10 +9,14 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: windows-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -30,3 +34,52 @@ jobs:
         run: python -m unittest discover -p 'test_*.py' -v
       - name: Run frontend tests
         run: node --test test_frontend.cjs
+      - name: Install packaging dependencies
+        run: python -m pip install -r requirements-desktop.txt
+      - name: Build Windows application
+        run: python build_desktop.py
+      - name: Verify packaged application with synthetic credentials
+        shell: powershell
+        run: |
+          $exe = Resolve-Path 'dist/CI-Operations/CI-Operations.exe'
+          $report = Join-Path $env:RUNNER_TEMP 'security-report.json'
+          & $exe --self-test-report $report
+          $result = Get-Content $report -Raw | ConvertFrom-Json
+          Get-Content $report -Raw
+          if (-not ($result.dpapi_encrypted -and $result.dpapi_roundtrip -and $result.dashboard_bundled -and $result.dashboard_english -and $result.frozen)) {
+            throw 'Packaged application self-test failed'
+          }
+      - name: Verify native setup and WebView2 dashboard
+        shell: pwsh
+        run: |
+          $exe = (Resolve-Path 'dist/CI-Operations/CI-Operations.exe').Path
+          $setupReport = Join-Path $env:RUNNER_TEMP 'setup-report.json'
+          $uiReport = Join-Path $env:RUNNER_TEMP 'webview-report.json'
+          & $exe --setup-smoke-report $setupReport
+          $setupExit = $LASTEXITCODE
+          & $exe --ui-smoke-report $uiReport
+          $uiExit = $LASTEXITCODE
+          foreach ($pair in @(@('setup', $setupReport, $setupExit, 60), @('webview', $uiReport, $uiExit, 60))) {
+            $deadline = (Get-Date).AddSeconds($pair[3])
+            while (-not (Test-Path $pair[1]) -and (Get-Date) -lt $deadline) { Start-Sleep -Seconds 2 }
+            if (-not (Test-Path $pair[1])) {
+              throw "$($pair[0]) verification did not produce a report (exit code $($pair[2])). The desktop session may be unavailable on this runner."
+            }
+            Write-Output "$($pair[0]) exit code: $($pair[2])"
+            Get-Content $pair[1] -Raw
+          }
+          $setup = Get-Content $setupReport -Raw | ConvertFrom-Json
+          $ui = Get-Content $uiReport -Raw | ConvertFrom-Json
+          if (-not ($setup.masked -and $setup.paste_verified -and $setup.ctrl_v_verified -and $setup.english_labels -and $setup.save_button_visible)) {
+            throw 'Native setup verification failed'
+          }
+          if (-not ($ui.window -and $ui.body)) {
+            throw 'WebView2 dashboard verification failed'
+          }
+      - name: Upload verified installer
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: CI-Operations-Setup
+          path: dist/CI-Operations-Setup.exe
+          if-no-files-found: error
+          retention-days: 14

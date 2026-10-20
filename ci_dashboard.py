@@ -4,12 +4,13 @@ Env: GITHUB_TOKEN (fine-grained PAT: Actions read + Administration read on repos
      REPOS (comma-separated owner/repo names; default owner/repo placeholder)
      PORT (default 8787), POLL (default 20), HOST (default 127.0.0.1)
      STATE_FILE: serve a static state JSON instead of polling (for snapshots)."""
-import json, os, threading, time, urllib.request, urllib.error
+import json, logging, os, signal, threading, time, urllib.request, urllib.error
 from datetime import datetime, timezone
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
 TOKEN = os.environ.get("GITHUB_TOKEN", "")
 REPOS = [r.strip() for r in os.environ.get("REPOS", "owner/repo").split(",") if r.strip()]
+LOGGER = logging.getLogger("ci_dashboard")
 HOST = os.environ.get("HOST", "127.0.0.1")
 PORT = int(os.environ.get("PORT", "8787")); POLL = max(5, int(os.environ.get("POLL", "20")))
 STATE = {"updated": None, "error": "starting", "runners": [], "jobs": [], "rate": None}
@@ -81,6 +82,7 @@ def _collect():
                 runners.append({"repo": repo, "name": rn["name"], "status": rn["status"], "busy": rn["busy"],
                                 "labels": [l["name"] for l in rn.get("labels", [])]})
         except urllib.error.HTTPError as e:
+            LOGGER.warning("runner inventory unavailable for %s (HTTP %s)", repo, e.code)
             errs.append(f"{repo} runners: HTTP {e.code} (needs Administration: read)")
             e.close()
         runs = {}
@@ -139,7 +141,21 @@ if __name__ == "__main__":
             STATE.update(json.load(source))
         STATE["snapshot"] = True
     else:
-        if not TOKEN: print("WARNING: GITHUB_TOKEN not set; private repos will 404")
+        if not TOKEN:
+            LOGGER.warning("GITHUB_TOKEN is not set; private repositories will return 404")
         threading.Thread(target=loop, daemon=True).start()
-    print(f"CI dashboard on http://{HOST}:{PORT}")
-    ThreadingHTTPServer((HOST, PORT), H).serve_forever()
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    if HOST not in ("127.0.0.1", "::1", "localhost"):
+        LOGGER.warning("BINDING TO %s EXPOSES CI DATA BEYOND THIS MACHINE. Use a firewall and authenticated reverse proxy.", HOST)
+    LOGGER.info("CI dashboard listening on http://%s:%s", HOST, PORT)
+    server = ThreadingHTTPServer((HOST, PORT), H)
+    def stop(signum, frame):
+        LOGGER.info("shutting down")
+        threading.Thread(target=server.shutdown, daemon=True).start()
+    for name in ("SIGINT", "SIGTERM"):
+        if hasattr(signal, name):
+            signal.signal(getattr(signal, name), stop)
+    try:
+        server.serve_forever()
+    finally:
+        server.server_close()

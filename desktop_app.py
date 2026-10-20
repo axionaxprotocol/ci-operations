@@ -1,8 +1,10 @@
 """Windows desktop entry point. Token gate + DPAPI + private WebView2 window."""
 import argparse
 import ctypes
+import faulthandler
 import hashlib
 import json
+import logging
 import os
 import subprocess
 import sys
@@ -12,7 +14,22 @@ from pathlib import Path
 
 from desktop_service import DesktopService
 from desktop_setup import launch_command, show_setup
-from desktop_store import DATA_DIR, SettingsError, load_settings, save_settings
+from desktop_store import DATA_DIR, LOG_PATH, SettingsError, load_settings, save_settings
+
+LOGGER = logging.getLogger('ci_operations')
+
+
+def configure_logging():
+    try:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        handler = logging.FileHandler(LOG_PATH, encoding='utf-8')
+        handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(name)s: %(message)s'))
+        logging.basicConfig(level=logging.INFO, handlers=[handler])
+        faulthandler.enable(handler.stream)
+        return
+    except OSError:
+        pass
+    logging.basicConfig(level=logging.INFO)
 
 
 def resource(name):
@@ -67,11 +84,13 @@ def run_dashboard(settings, smoke_report=None):
         finally:
             window.destroy()
 
+    LOGGER.info('dashboard window opening')
     try:
         webview.start(smoke if smoke_report else None, gui='edgechromium', debug=False,
                       private_mode=True, menu=menu, icon=str(resource('app.ico')))
     finally:
         service.close()
+        LOGGER.info('dashboard closed')
     return bool(reconfigure)
 
 
@@ -82,6 +101,7 @@ def main():
     parser.add_argument('--self-test-report')
     parser.add_argument('--ui-smoke-report')
     parser.add_argument('--setup-smoke-report')
+    configure_logging()
     args = parser.parse_args()
     if args.self_test_report:
         self_test(args.self_test_report)
@@ -119,6 +139,7 @@ def main():
         except SettingsError:
             settings = None
             notice = 'Could not read saved credentials. Please configure your token again.'
+            LOGGER.warning('saved settings could not be decrypted')
         if args.configure or not settings:
             settings = show_setup(settings, notice)
         if settings:
@@ -126,6 +147,7 @@ def main():
     finally:
         kernel.ReleaseMutex(mutex)
         kernel.CloseHandle(mutex)
+    LOGGER.info('application exiting')
     if reconfigure:
         subprocess.Popen(launch_command() + ['--configure'], close_fds=True)
 
@@ -134,11 +156,19 @@ if __name__ == '__main__':
     try:
         main()
     except Exception:
-        # Never write a traceback containing request/token locals to disk.
-        import tkinter as tk
-        from tkinter import messagebox
-        root = tk.Tk()
-        root.withdraw()
-        messagebox.showerror('CI Operations', 'Could not start CI Operations. Ensure Microsoft Edge WebView2 Runtime is installed.\nIf the issue persists, open GitHub Settings or reinstall the app.')
-        root.destroy()
+        # Never log a traceback: exception text may echo request headers or credentials.
+        error = sys.exc_info()[1]
+        try:
+            LOGGER.error('startup failed (%s)', type(error).__name__)
+        except Exception:
+            pass
+        try:
+            import tkinter as tk
+            from tkinter import messagebox
+            root = tk.Tk()
+            root.withdraw()
+            messagebox.showerror('CI Operations', 'Could not start CI Operations. Ensure Microsoft Edge WebView2 Runtime is installed.\nIf the issue persists, open GitHub Settings or reinstall the app.\nDiagnostic log: ' + str(LOG_PATH))
+            root.destroy()
+        except Exception:
+            pass
         sys.exit(1)

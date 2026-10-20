@@ -9,6 +9,7 @@ from pathlib import Path
 APP_NAME = 'CI Operations'
 DATA_DIR = Path(os.environ.get('LOCALAPPDATA', Path.home())) / 'CIOperations'
 SETTINGS_PATH = DATA_DIR / 'settings.dat'
+LOG_PATH = DATA_DIR / 'app.log'
 
 
 class SettingsError(Exception):

@@ -1,0 +1,125 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - name: Verify tests before packaging
+        run: |
+          python -m unittest discover -p 'test_*.py' -v
+          node --test test_frontend.cjs
+      - name: Install packaging dependencies
+        run: python -m pip install -r requirements-desktop.txt
+      - name: Build application and installer
+        run: python build_desktop.py
+      - name: Verify packaged application
+        shell: powershell
+        run: |
+          $exe = Resolve-Path 'dist/CI-Operations/CI-Operations.exe'
+          $report = Join-Path $env:RUNNER_TEMP 'security-report.json'
+          & $exe --self-test-report $report
+          $result = Get-Content $report -Raw | ConvertFrom-Json
+          Get-Content $report -Raw
+          if (-not ($result.dpapi_encrypted -and $result.dpapi_roundtrip -and $result.dashboard_bundled -and $result.frozen)) {
+            throw 'Packaged application self-test failed'
+          }
+      - name: Sign installer when signing secrets are configured
+        if: ${{ env.SIGN_CERTIFICATE != '' }}
+        shell: powershell
+        env:
+          SIGN_CERTIFICATE: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE }}
+          SIGN_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PASSWORD }}
+        run: |
+          $pfx = Join-Path $env:RUNNER_TEMP 'signing.pfx'
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:SIGN_CERTIFICATE))
+          $signTool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -Filter signtool.exe |
+            Where-Object { $_.FullName -like '*x64*' } | Select-Object -Last 1
+          if (-not $signTool) { throw 'signtool.exe not found' }
+          & $signTool.FullName sign /fd SHA256 /f $pfx /p $env:SIGN_PASSWORD `
+            /tr http://timestamp.digicert.com /td SHA256 'dist/CI-Operations-Setup.exe'
+          Remove-Item $pfx -Force
+          if ($LASTEXITCODE -ne 0) { throw 'Signing failed' }
+      - name: Record unsigned status
+        shell: powershell
+        run: |
+          $signature = Get-AuthenticodeSignature 'dist/CI-Operations-Setup.exe'
+          "signature_status=$($signature.Status)" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+      - name: Compute checksum
+        shell: powershell
+        run: |
+          $hash = (Get-FileHash 'dist/CI-Operations-Setup.exe' -Algorithm SHA256).Hash.ToLower()
+          "$hash  CI-Operations-Setup.exe" | Out-File -FilePath 'dist/SHA256SUMS.txt' -Encoding ascii
+          Get-Content 'dist/SHA256SUMS.txt'
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/CI-Operations-Setup.exe
+      - name: Upload release assets
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-assets
+          path: |
+            dist/CI-Operations-Setup.exe
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified assets
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-assets
+          path: release-assets
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        with:
+          files: |
+            release-assets/CI-Operations-Setup.exe
+            release-assets/SHA256SUMS.txt
+          fail_on_unmatched_files: true
+          generate_release_notes: true
+          body: |
+            Windows installer built from this tag by the release workflow.
+
+            - Verify the download against `SHA256SUMS.txt`.
+            - Build provenance attestation is available on the workflow run (`gh attestation verify`).
+            - If no signing certificate is configured, the installer is **unsigned** and Windows SmartScreen may warn.
+            - Requires Microsoft Edge WebView2 Runtime and .NET Framework 4.6.2 or later.
+            - Never enter tokens into builds downloaded from untrusted mirrors.
