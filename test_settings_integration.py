@@ -55,8 +55,9 @@ class SettingsWindowIntegrationTests(unittest.TestCase):
         service = desktop_service.DesktopService({'token': 'TEST-ONLY-NOT-REAL', 'repos': ['o/r']}, poll=False)
         try:
             updated = {'token': 'TEST-ONLY-NOT-REAL', 'repos': ['fresh/repo'], 'poll': 30}
-            with patch.object(desktop_service, 'load_settings', return_value=updated):
-                service.settings_stamp = (service._settings_stamp() or 0) - 1
+            with patch.object(desktop_service, 'load_settings', return_value=updated), \
+                 patch.object(service, '_settings_stamp', return_value=2):
+                service.settings_stamp = 1
                 service.watch_settings()
             self.assertEqual(desktop_service.dashboard.REPOS, ['fresh/repo'])
         finally:

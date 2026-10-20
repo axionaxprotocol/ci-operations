@@ -155,7 +155,7 @@ class DesktopService:
         self.thread.start()
         if self.poll_enabled:
             self.poll_thread.start()
-        self.watch_thread.start()
+            self.watch_thread.start()
 
     def close(self):
         self.stop.set()
