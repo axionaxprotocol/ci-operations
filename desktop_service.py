@@ -8,6 +8,7 @@ from http.cookies import SimpleCookie
 from http.server import ThreadingHTTPServer
 
 import ci_dashboard as dashboard
+from desktop_alerts import notify_new_failures
 from desktop_history import load_store
 from desktop_store import DATA_DIR, SETTINGS_PATH, SettingsError, load_settings, parse_repos
 
@@ -92,6 +93,7 @@ class DesktopService:
         self.session_value = ''
         self.poll_enabled = poll
         self.history = load_store(HISTORY_PATH, enabled=settings.get('history', True) is not False)
+        self.notifications_enabled = settings.get('notifications', True) is not False
         owner = self
 
         class GuardedHandler(dashboard.H):
@@ -191,6 +193,7 @@ class DesktopService:
                 if dashboard.STATE.get('error'):
                     dashboard.STATE['error'] = 'GitHub data is incomplete or unavailable. Check your connection and token permissions (Actions/Administration: Read).'
                 self.record_history()
+                self.raise_failure_notifications()
             except Exception:
                 # Never include exception repr, request headers or credentials in the UI.
                 dashboard.STATE['error'] = 'GitHub connection failed. Please try again or check your token.'
@@ -208,6 +211,17 @@ class DesktopService:
         except Exception:
             LOGGER.warning('job history could not be written')
             return 0
+
+    def raise_failure_notifications(self):
+        """Raise a toast for each newly failed job."""
+        if self.history is None:
+            return False
+        try:
+            return notify_new_failures(self.history, dashboard.STATE.get('jobs') or [],
+                                       enabled=self.notifications_enabled)
+        except Exception:
+            LOGGER.warning('failure notifications could not be raised')
+            return False
 
     def prune_history(self):
         """Drop history that has aged out of the retention window."""
@@ -243,6 +257,7 @@ class DesktopService:
         dashboard.TOKEN = token
         dashboard.REPOS = repos
         dashboard.POLL = max(20, int(settings.get('poll', 30)))
+        self.notifications_enabled = settings.get('notifications', True) is not False
         dashboard._cache.clear()
         dashboard._etag.clear()
         dashboard._links.clear()

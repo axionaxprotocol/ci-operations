@@ -5,6 +5,7 @@ The history database already records every job it has seen, so it can answer
 so a repeated observation of the same failure is never reported twice.
 """
 from desktop_history import FAILED_CONCLUSIONS, job_key
+from desktop_notify import notify_failure
 
 
 def new_failures(store, jobs):
@@ -39,3 +40,15 @@ def describe(job):
     workflow = (job or {}).get('workflow') or 'workflow'
     name = (job or {}).get('name') or 'job'
     return f'{workflow} · {name} failed in {repo}'
+
+
+def notify_new_failures(store, jobs, enabled=True):
+    """Raise a toast for each newly failed job. Returns True when a toast was raised."""
+    if not enabled:
+        return False
+    fresh = new_failures(store, jobs)
+    if not fresh:
+        return False
+    for job in fresh:
+        notify_failure(job, enabled=enabled)
+    return True

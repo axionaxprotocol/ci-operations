@@ -70,5 +70,46 @@ class NewFailureTests(unittest.TestCase):
         self.assertTrue(text)
 
 
+class NotificationDispatchTests(unittest.TestCase):
+    def test_notifying_twice_does_not_raise_a_second_toast(self):
+        import desktop_alerts
+        calls = []
+        from unittest.mock import patch
+        with patch.object(desktop_alerts, 'notify_failure', side_effect=lambda job, **k: calls.append(job)):
+            directory = tempfile.TemporaryDirectory()
+            self.addCleanup(directory.cleanup)
+            local = HistoryStore(Path(directory.name) / 'history.db')
+            self.addCleanup(local.close)
+            first = desktop_alerts.notify_new_failures(local, [job()])
+            second = desktop_alerts.notify_new_failures(local, [job()])
+        self.assertTrue(first)
+        self.assertFalse(second)
+        self.assertEqual(len(calls), 1)
+
+    def test_no_failures_raises_no_toast(self):
+        import desktop_alerts
+        calls = []
+        from unittest.mock import patch
+        with patch.object(desktop_alerts, 'notify_failure', side_effect=lambda job, **k: calls.append(job)):
+            directory = tempfile.TemporaryDirectory()
+            self.addCleanup(directory.cleanup)
+            local = HistoryStore(Path(directory.name) / 'history.db')
+            self.addCleanup(local.close)
+            self.assertFalse(desktop_alerts.notify_new_failures(local, []))
+        self.assertEqual(calls, [])
+
+    def test_notifications_can_be_switched_off(self):
+        import desktop_alerts
+        calls = []
+        from unittest.mock import patch
+        with patch.object(desktop_alerts, 'notify_failure', side_effect=lambda job, **k: calls.append(job)):
+            directory = tempfile.TemporaryDirectory()
+            self.addCleanup(directory.cleanup)
+            local = HistoryStore(Path(directory.name) / 'history.db')
+            self.addCleanup(local.close)
+            desktop_alerts.notify_new_failures(local, [job()], enabled=False)
+        self.assertEqual(calls, [], 'a disabled notification still raised a toast')
+
+
 if __name__ == '__main__':
     unittest.main()

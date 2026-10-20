@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 import desktop_history
 import desktop_service
+import ci_dashboard as dashboard
 
 
 class ServiceTests(unittest.TestCase):
@@ -213,6 +214,44 @@ class ServiceTests(unittest.TestCase):
                 data = json.load(response)
             self.assertLessEqual(len(data['jobs']), 50, 'the history payload was not capped')
             self.assertEqual(data['summary']['total'], 60, 'the summary must count every job')
+        finally:
+            service.close()
+
+    def test_the_service_raises_a_toast_for_a_newly_failed_job(self):
+        service = desktop_service.DesktopService({'token': 'TEST-ONLY-NOT-REAL', 'repos': ['o/r']}, poll=False)
+        isolated = tempfile.TemporaryDirectory()
+        self.addCleanup(isolated.cleanup)
+        service.history = desktop_history.HistoryStore(Path(isolated.name) / 'history.db')
+        self.addCleanup(service.history.close)
+        calls = []
+        try:
+            with patch('desktop_service.notify_new_failures',
+                       side_effect=lambda store, jobs, enabled=True: calls.append(jobs) or True):
+                dashboard.STATE['jobs'] = [{
+                    'repo': 'o/r', 'run_id': 1, 'job_id': 10, 'name': 'build', 'workflow': 'CI',
+                    'status': 'completed', 'conclusion': 'failure', 'steps': []}]
+                service.raise_failure_notifications()
+            self.assertEqual(len(calls), 1)
+        finally:
+            dashboard.STATE['jobs'] = []
+            service.close()
+
+    def test_notifications_are_off_when_the_setting_says_so(self):
+        service = desktop_service.DesktopService(
+            {'token': 'TEST-ONLY-NOT-REAL', 'repos': ['o/r'], 'notifications': False}, poll=False)
+        self.assertFalse(service.notifications_enabled)
+        service.close()
+
+    def test_notifications_are_on_by_default(self):
+        service = desktop_service.DesktopService({'token': 'TEST-ONLY-NOT-REAL', 'repos': ['o/r']}, poll=False)
+        self.assertTrue(service.notifications_enabled)
+        service.close()
+
+    def test_applying_settings_updates_the_notification_toggle(self):
+        service = desktop_service.DesktopService({'token': 'TEST-ONLY-NOT-REAL', 'repos': ['o/r']}, poll=False)
+        try:
+            service.apply_settings({'token': 'TEST-ONLY-NOT-REAL', 'repos': ['o/r'], 'notifications': False})
+            self.assertFalse(service.notifications_enabled)
         finally:
             service.close()
 
