@@ -17,6 +17,8 @@ class DesktopService:
         self.secret = secrets.token_urlsafe(32)
         self.bootstrap_lock = threading.Lock()
         self.bootstrapped = False
+        # Session secret used only to set the HttpOnly cookie; never exposed to the page.
+        self.session_value = ''
         self.poll_enabled = poll
         owner = self
 
@@ -44,9 +46,10 @@ class DesktopService:
                     bootstrap = self.path == '/launch/' + owner.secret and not owner.bootstrapped
                     if bootstrap:
                         owner.bootstrapped = True
+                        owner.session_value = secrets.token_urlsafe(32)
                 if bootstrap:
                     self.send_response(302)
-                    self.send_header('Set-Cookie', f'{owner.cookie}={owner.secret}; Path=/; HttpOnly; SameSite=Strict')
+                    self.send_header('Set-Cookie', f'{owner.cookie}={owner.session_value}; Path=/; HttpOnly; SameSite=Strict')
                     self.send_header('Location', '/')
                     self.send_header('Cache-Control', 'no-store')
                     self.send_header('Referrer-Policy', 'no-referrer')
@@ -60,7 +63,7 @@ class DesktopService:
                 except Exception:
                     supplied = ''
                 try:
-                    valid = secrets.compare_digest(supplied, owner.secret)
+                    valid = bool(owner.session_value) and secrets.compare_digest(supplied, owner.session_value)
                 except (TypeError, ValueError):
                     valid = False
                 if not valid:
