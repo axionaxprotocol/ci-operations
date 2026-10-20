@@ -33,15 +33,15 @@ CREATE TABLE IF NOT EXISTS jobs (
 );
 CREATE INDEX IF NOT EXISTS jobs_repo_time ON jobs(repo, completed);
 CREATE TABLE IF NOT EXISTS steps (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
     job_key TEXT NOT NULL,
+    number INTEGER NOT NULL,
     name TEXT,
     conclusion TEXT,
-    number INTEGER,
     started TEXT,
     completed TEXT,
     duration_ms INTEGER,
-    recorded_at REAL NOT NULL
+    recorded_at REAL NOT NULL,
+    PRIMARY KEY (job_key, number)
 );
 CREATE INDEX IF NOT EXISTS steps_job ON steps(job_key);
 """
@@ -94,7 +94,32 @@ class HistoryStore:
         self.connection = sqlite3.connect(str(self.path), check_same_thread=False)
         self.connection.row_factory = sqlite3.Row
         self.connection.executescript(SCHEMA)
+        self._migrate_steps()
         self.connection.commit()
+
+    def _migrate_steps(self):
+        """Rebuild a legacy steps table that used a surrogate id and no unique key.
+
+        The legacy table appended a fresh copy of every step on every poll, so the
+        same failure was counted once per poll. Rebuilding collapses those rows.
+        """
+        with self.lock:
+            columns = [row[1] for row in self.connection.execute('PRAGMA table_info(steps)')]
+            if 'id' not in columns:
+                return
+            self.connection.execute('DROP TABLE IF EXISTS steps_new')
+            self.connection.execute(
+                'CREATE TABLE steps_new ('
+                'job_key TEXT NOT NULL, number INTEGER NOT NULL, name TEXT, conclusion TEXT, '
+                'started TEXT, completed TEXT, duration_ms INTEGER, recorded_at REAL NOT NULL, '
+                'PRIMARY KEY (job_key, number))')
+            self.connection.execute(
+                'INSERT OR REPLACE INTO steps_new (job_key,number,name,conclusion,started,completed,duration_ms,recorded_at) '
+                'SELECT job_key, COALESCE(number, 0), name, conclusion, started, completed, duration_ms, recorded_at FROM steps')
+            self.connection.execute('DROP TABLE steps')
+            self.connection.execute('ALTER TABLE steps_new RENAME TO steps')
+            self.connection.execute('CREATE INDEX IF NOT EXISTS steps_job ON steps(job_key)')
+            self.connection.commit()
 
     def close(self):
         with self.lock:
@@ -118,7 +143,7 @@ class HistoryStore:
                 _duration_ms(job), now))
             for step in job.get('steps') or []:
                 step_rows.append((
-                    key, step.get('name'), step.get('conclusion'), step.get('number'),
+                    key, step.get('number') or 0, step.get('name'), step.get('conclusion'),
                     step.get('started'), step.get('completed'),
                     _duration_ms(step), now))
         if not rows and not step_rows:
@@ -130,7 +155,7 @@ class HistoryStore:
                 'status,runner,sha,url,created,started,completed,duration_ms,recorded_at) '
                 'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', rows)
             self.connection.executemany(
-                'INSERT INTO steps (job_key,name,conclusion,number,started,completed,duration_ms,recorded_at) '
+                'INSERT OR REPLACE INTO steps (job_key,number,name,conclusion,started,completed,duration_ms,recorded_at) '
                 'VALUES (?,?,?,?,?,?,?,?)', step_rows)
             self.connection.commit()
             inserted = self.connection.total_changes - before
