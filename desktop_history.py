@@ -188,6 +188,12 @@ class HistoryStore:
             rows = self.connection.execute(query, params).fetchall()
         return [dict(row) for row in rows]
 
+    def has_job(self, key):
+        """True when this job has already been recorded."""
+        with self.lock:
+            row = self.connection.execute('SELECT 1 FROM jobs WHERE key = ? LIMIT 1', (key,)).fetchone()
+        return row is not None
+
     def steps_for(self, keys):
         """Return the recorded steps for the given job keys."""
         keys = list(keys)
