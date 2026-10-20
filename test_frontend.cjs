@@ -42,9 +42,10 @@ test('session gate rejects methods that could mutate or echo state',()=>{
  assert.match(source,/if self\.command != 'GET':/);
 });
 test('untrusted names and links cannot inject HTML', async()=>{
-  const p = page({runners:[{name:'<img src=x onerror=alert(1)>',repo:'o/r',status:'online'}],jobs:[{repo:'o/r',name:'<script>bad</script>',status:'queued',created:null,url:'javascript:alert(1)'}],error:'<img src=x>',updated:null});
+  const p = page({runners:[{name:'<img src=x onerror=alert(1)>',repo:'o/r',status:'online'}],jobs:[{repo:'o/r',name:'<script>bad<script>',status:'queued',created:null,url:'javascript:alert(1)'}],error:'<img src=x>',updated:null});
   await vm.runInContext('load()',p.context);
   const rendered = ['runners','queue','err'].map(id=>p.element(id).innerHTML).join('');
+  assert.equal(vm.runInContext('esc("<script>bad<script>")', p.context), '&lt;script&gt;bad&lt;script&gt;');
   assert.ok(!rendered.includes('<img'));
   assert.ok(!rendered.includes('<script>bad'));
   assert.ok(!rendered.includes('href="javascript:'));
