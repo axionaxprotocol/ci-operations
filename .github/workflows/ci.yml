@@ -50,17 +50,26 @@ jobs:
             throw 'Packaged application self-test failed'
           }
       - name: Verify native setup and WebView2 dashboard
-        shell: powershell
+        shell: pwsh
         run: |
-          $exe = Resolve-Path 'dist/CI-Operations/CI-Operations.exe'
+          $exe = (Resolve-Path 'dist/CI-Operations/CI-Operations.exe').Path
           $setupReport = Join-Path $env:RUNNER_TEMP 'setup-report.json'
           $uiReport = Join-Path $env:RUNNER_TEMP 'webview-report.json'
           & $exe --setup-smoke-report $setupReport
+          $setupExit = $LASTEXITCODE
           & $exe --ui-smoke-report $uiReport
+          $uiExit = $LASTEXITCODE
+          foreach ($pair in @(@('setup', $setupReport, $setupExit, 60), @('webview', $uiReport, $uiExit, 60))) {
+            $deadline = (Get-Date).AddSeconds($pair[3])
+            while (-not (Test-Path $pair[1]) -and (Get-Date) -lt $deadline) { Start-Sleep -Seconds 2 }
+            if (-not (Test-Path $pair[1])) {
+              throw "$($pair[0]) verification did not produce a report (exit code $($pair[2])). The desktop session may be unavailable on this runner."
+            }
+            Write-Output "$($pair[0]) exit code: $($pair[2])"
+            Get-Content $pair[1] -Raw
+          }
           $setup = Get-Content $setupReport -Raw | ConvertFrom-Json
           $ui = Get-Content $uiReport -Raw | ConvertFrom-Json
-          Get-Content $setupReport -Raw
-          Get-Content $uiReport -Raw
           if (-not ($setup.masked -and $setup.paste_verified -and $setup.ctrl_v_verified -and $setup.english_labels -and $setup.save_button_visible)) {
             throw 'Native setup verification failed'
           }
