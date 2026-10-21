@@ -18,6 +18,8 @@ A local Windows desktop console for monitoring GitHub Actions runners and jobs. 
 - Runner fleet, active executions, pending jobs, repository health, a 60-minute execution timeline, and recent job results.
 - Durable local job history in SQLite, so reliability data survives restarts. Stored at `%LOCALAPPDATA%\CIOperations\history.db` and never uploaded.
 - A Reliability panel with success rate, failure count, median and 95th-percentile duration, and the steps that fail most often.
+- An interactive 3D execution volume. Time runs along the X axis, each repository sits on its own depth plane, and every job is a bar coloured by its result. Drag to orbit, scroll to zoom, shift-drag to pan, hover a bar for its details.
+- The 3D view is drawn with hand-written WebGL2 and no third-party library, so the packaged application stays self-contained and never reaches the network. Where WebGL2 is unavailable the dashboard falls back to the flat timeline and tables.
 - History windows of 24 hours, 7 days, 30 days, or everything stored, plus CSV export of the selected window.
 - Windows toast notifications when a job fails, so a red build is noticed without watching the window. Toggle them with **Notify me when a job fails** in settings.
 - Adaptive polling that slows down when the GitHub rate limit runs low and speeds up while a job is running.
@@ -129,6 +131,7 @@ For snapshot mode, set `STATE_FILE` to a JSON file containing `runners` and `job
 - **Execution timeline**: jobs with runner names and valid start times within the last 60 minutes; overlapping executions use separate tracks.
 - **Reliability**: success rate, failure count, median duration, and 95th-percentile duration over the locally stored history for the selected window. This covers only jobs seen while the app was running, so it is not a complete historical record of the repository.
 - **Most frequent failing steps**: the steps GitHub reported as failed, ranked by how often they broke. Steps are only recorded for jobs the app observed. Each recorded step is counted once per job, not once per poll, so the ranking reflects distinct failing jobs.
+- **3D execution volume**: the same executions the timeline shows, placed in space. Time runs left to right across the 60-minute window, each repository gets its own depth plane, and each runner a row within its plane. A bar's length is the job duration and its colour is the result. The volume is an exploration aid: the timeline and results table remain the precise-reading surfaces.
 
 Connection failures, incomplete API data, and stale data are shown separately from offline runner status. Data older than 90 seconds is marked stale. The collector retrieves active workflows plus recently created runs; this is not a complete historical archive.
 
@@ -170,6 +173,7 @@ These modes exercise credential encryption, native setup controls, bundled resou
 | --- | --- |
 | `ci_dashboard.py` | GitHub collector and optional browser-only server |
 | `index.html` | Dependency-free operations dashboard |
+| `fleet3d.js` | WebGL2 execution-volume renderer: scene layout, camera, picking |
 | `desktop_app.py` | Desktop launcher, single-instance lifecycle, application menu |
 | `desktop_setup.py` | Native setup, validation, paste support, optional startup |
 | `desktop_store.py` | Current-user DPAPI encrypted settings |

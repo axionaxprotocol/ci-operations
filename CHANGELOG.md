@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-20
+
+### Added
+
+- An interactive 3D execution volume, reachable from **3D volume** in the navigation. Time runs along the X axis, each repository occupies its own depth plane, and each runner gets a row inside that plane. Every job is a bar whose length is its duration and whose colour is its result, so a cluster of failures on one repository is visible as a shape rather than a number.
+- The camera can be orbited by dragging, zoomed with the scroll wheel, and panned with shift-drag. Hovering or clicking a bar shows the job, its repository, its runner and its result. **Reset view** returns to the framed overview, and the arrow keys, `+`, `-` and `Home` do the same from the keyboard.
+- The renderer is hand-written WebGL2 with no third-party library, so the packaged application stays self-contained and never makes an external request. The engine is served from the same loopback origin under the same session gate and the same content-security policy as the dashboard.
+- Axis labels for the time ticks and the repository planes are drawn over the canvas, so the scene stays readable without a legend to decode.
+
+### Fixed
+
+- A separator inside a repository or runner name could make two different jobs collide onto the same row. Job and row keys are now built with `JSON.stringify`, which cannot collide.
+
 ## [1.2.1] - 2026-10-20
 
 ### Fixed
