@@ -313,6 +313,181 @@ test('framing respects the aspect ratio it is given', () => {
   assert.notEqual(Math.round(wide.distance), Math.round(tall.distance));
 });
 
+
+// --- the illustrated look ---------------------------------------------------
+
+test('the camera starts in a true isometric position', () => {
+  const camera = Fleet3D.createCamera();
+  assert.ok(Math.abs(camera.yaw - (-Math.PI / 4)) < 1e-9, 'yaw must be 45 degrees');
+  assert.ok(Math.abs(camera.pitch - Math.asin(1 / Math.sqrt(3))) < 1e-9, 'pitch must be the isometric angle');
+});
+
+test('the projection is orthographic, so depth does not shrink a point', () => {
+  const frame = Fleet3D.mat4.orthographic(new Float32Array(16), -10, 10, -10, 10, -100, 100);
+  const near = Fleet3D.mat4.project(frame, [5, 0, 0]);
+  const far = Fleet3D.mat4.project(frame, [5, 0, 50]);
+  assert.equal(near.x, far.x, 'a point keeps the same size however deep it is');
+  assert.equal(near.y, far.y, 'a point keeps the same size however deep it is');
+});
+
+test('a solid is shaded in three flat tones by face direction', () => {
+  const top = Fleet3D.faceTone([0, 1, 0]);
+  const front = Fleet3D.faceTone([0, 0, 1]);
+  const side = Fleet3D.faceTone([1, 0, 0]);
+  assert.ok(top > front, 'the top face must be the lightest');
+  assert.ok(front > side, 'the front face must be lighter than the side');
+  assert.notEqual(front, side, 'the three tones must be distinct');
+});
+
+test('a block is drawn as a closed solid with an outline', () => {
+  const layout = Fleet3D.buildLayout([job()], {now: NOW, windowMs: WINDOW});
+  const block = Fleet3D.buildBlock(layout.boxes[0]);
+  assert.equal(block.positions.length / 3, 36, 'a box has twelve triangles');
+  assert.equal(block.colors.length / 3, 36);
+  const edges = Fleet3D.buildBlockEdges(layout.boxes[0]);
+  assert.equal(edges.positions.length / 3, 24, 'a box has twelve outline edges');
+});
+
+test('the outline sits just outside the solid so it wins the depth test', () => {
+  const layout = Fleet3D.buildLayout([job()], {now: NOW, windowMs: WINDOW});
+  const box = layout.boxes[0];
+  const block = Fleet3D.buildBlock(box);
+  const edges = Fleet3D.buildBlockEdges(box);
+  const solidMax = Math.max.apply(null, block.positions);
+  const edgeMax = Math.max.apply(null, edges.positions);
+  assert.ok(edgeMax > solidMax, 'the outline must reach further out than the solid');
+});
+
+test('a job is drawn as a cable that arcs above its row', () => {
+  const layout = Fleet3D.buildLayout([job()], {now: NOW, windowMs: WINDOW});
+  const box = layout.boxes[0];
+  const cable = Fleet3D.buildCable(box);
+  assert.ok(cable.positions.length > 0, 'the cable must have geometry');
+  const ys = cable.positions.filter((_, i) => i % 3 === 1);
+  const maxY = Math.max.apply(null, ys);
+  assert.ok(maxY > box.y + 2, 'the cable must arc above the row it belongs to');
+});
+
+test('the cable starts at the job and ends at the job end', () => {
+  const layout = Fleet3D.buildLayout([job()], {now: NOW, windowMs: WINDOW});
+  const box = layout.boxes[0];
+  const cable = Fleet3D.buildCable(box);
+  const xs = cable.positions.filter((_, i) => i % 3 === 0);
+  const minX = Math.min.apply(null, xs);
+  const maxX = Math.max.apply(null, xs);
+  assert.ok(minX >= box.x0 - 1, 'the cable must start at the job');
+  assert.ok(maxX <= box.x1 + 1, 'the cable must end at the job end');
+});
+
+test('the palette is the warm parchment of the reference illustration', () => {
+  const toHex = rgb => '#' + rgb.map(c => Math.round(c * 255).toString(16).padStart(2, '0')).join('');
+  assert.equal(toHex(Fleet3D.PALETTE.ground), '#f5ebdb');
+  assert.equal(toHex(Fleet3D.PALETTE.outline), '#101020');
+  assert.equal(toHex(Fleet3D.COLORS.success), '#3ca064');
+  assert.equal(toHex(Fleet3D.COLORS.failure), '#c83c3c');
+  assert.equal(toHex(Fleet3D.COLORS.running), '#f0b43c');
+});
+
+test('the circuit artwork is faint and covers the area behind the data', () => {
+  const layout = Fleet3D.buildLayout([job()], {now: NOW, windowMs: WINDOW});
+  const traces = Fleet3D.buildTraces(layout);
+  assert.ok(traces.positions.length > 0, 'there must be some circuit artwork');
+  const xs = traces.positions.filter((_, i) => i % 3 === 0);
+  assert.ok(Math.min.apply(null, xs) < layout.bounds.minX, 'the artwork must extend past the data');
+  assert.ok(Math.max.apply(null, xs) > layout.bounds.maxX, 'the artwork must extend past the data');
+});
+
+test('the ground grid marks every runner row and time tick', () => {
+  const layout = Fleet3D.buildLayout([job(), job({runner: 'w2'})], {now: NOW, windowMs: WINDOW});
+  const grid = Fleet3D.buildGrid(layout);
+  // One line per plane, per tick and per runner row.
+  const expected = layout.planes.length + layout.ticks.length + layout.rows.length;
+  assert.equal(grid.positions.length / 6, expected, 'one line segment per gridline');
+});
+
+test('a repository sits on its own slab', () => {
+  const layout = Fleet3D.buildLayout([job(), job({repo: 'o/b'})], {now: NOW, windowMs: WINDOW});
+  const platform = Fleet3D.buildPlatform(layout.planes[0], layout.bounds);
+  assert.ok(platform.positions.length > 0);
+  const zs = platform.positions.filter((_, i) => i % 3 === 2);
+  assert.ok(Math.min.apply(null, zs) >= layout.planes[0].z - 2, 'the slab must start at its plane');
+});
+
+
+test('a ray built for a screen point hits the object drawn there', () => {
+  // The pick ray must agree with the projection, or hovering picks the wrong
+  // job. This is the whole pointer path in one assertion.
+  const layout = Fleet3D.buildLayout([job(), job({repo: 'o/b', runner: 'w9'})], {now: NOW, windowMs: WINDOW});
+  const camera = Fleet3D.createCamera();
+  Fleet3D.frameLayout(camera, layout, 1.8);
+  const aspect = 1.8;
+  layout.boxes.forEach((box) => {
+    const corner = [box.x0 + 1.1, box.y + 0.9, box.z + 1.1];
+    const projected = Fleet3D.mat4.project(Fleet3D.viewProjection(camera, aspect), corner);
+    assert.ok(projected.visible, 'the box must be on screen');
+    const ray = Fleet3D.cameraRay(camera, projected.x, projected.y, aspect);
+    const hit = Fleet3D.rayBox(ray.origin, ray.direction, {
+      min: [box.x0, box.y + 0.22, box.z],
+      max: [box.x0 + 2.2, box.y + 0.22 + 2.2 * 0.8, box.z + 2.2],
+    });
+    assert.ok(hit !== null, 'the ray for ' + box.name + ' must hit its own box');
+  });
+});
+
+test('a ray at the centre of the screen points at the camera target', () => {
+  const camera = Fleet3D.createCamera();
+  const ray = Fleet3D.cameraRay(camera, 0, 0, 1.5);
+  // Walking the ray for the camera distance must land on the target.
+  const at = [
+    ray.origin[0] + ray.direction[0] * camera.distance,
+    ray.origin[1] + ray.direction[1] * camera.distance,
+    ray.origin[2] + ray.direction[2] * camera.distance,
+  ];
+  camera.target.forEach((value, axis) => {
+    assert.ok(Math.abs(at[axis] - value) < 1e-6, 'axis ' + axis + ' landed at ' + at[axis]);
+  });
+});
+
+
+test('the 3D view has a floating control bar like the reference', () => {
+  assert.match(html, /class="volume-controls"/);
+  assert.match(html, /id="volume-left"/);
+  assert.match(html, /id="volume-right"/);
+  assert.match(html, /id="volume-in"/);
+  assert.match(html, /id="volume-out"/);
+  assert.match(html, /id="volume-info"/);
+});
+
+test('the control buttons carry accessible names', () => {
+  for (const id of ['volume-left', 'volume-right', 'volume-in', 'volume-out', 'volume-info']) {
+    const pattern = new RegExp('id="' + id + '"[^>]*aria-label="[^"]+"');
+    assert.match(html, pattern, id + ' needs an aria-label');
+  }
+});
+
+test('the how-to-read note is hidden until it is asked for', () => {
+  assert.match(html, /id="volume-note"[^>]*hidden/);
+  assert.match(html, /How to read this/);
+});
+
+test('the 3D stage uses the warm parchment ground of the reference', () => {
+  const css = html.match(/<style>([\s\S]*?)<\/style>/)[1];
+  assert.match(css, /\.volume-stage\{[^}]*background:#f5ebdb/);
+});
+
+test('the legend colours match the reference illustration', () => {
+  const css = html.match(/<style>([\s\S]*?)<\/style>/)[1];
+  assert.match(css, /dot\.good\{background:#3ca064\}/);
+  assert.match(css, /dot\.danger\{background:#c83c3c\}/);
+  assert.match(css, /dot\.warning\{background:#f0b43c\}/);
+});
+
+test('the viewer exposes the rotate and zoom actions the control bar uses', () => {
+  const source = fs.readFileSync(path.join(__dirname, 'fleet3d.js'), 'utf8');
+  assert.match(source, /rotate: function/);
+  assert.match(source, /zoomBy: function/);
+});
+
 // --- integration with the dashboard ----------------------------------------
 
 test('the viewer gives up cleanly when the browser has no WebGL2', () => {

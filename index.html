@@ -12,8 +12,8 @@
 .right-stack{display:grid;gap:20px;min-width:0}.repo-row{padding:16px 20px;border-bottom:1px solid var(--line)}.repo-row:last-child{border-bottom:0}.repo-title{font:14px var(--mono);overflow-wrap:anywhere;margin-bottom:9px}.repo-stats{display:flex;gap:12px;flex-wrap:wrap;font-size:14px;color:var(--muted)}
 .reliability-body{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0}.reliability-body .metrics{border-right:1px solid var(--line)}.reliability-body .metrics .metric:last-child{border-right:0}.failing-steps{padding:18px 20px;min-width:0}.failing-steps h3{margin:0 0 4px;font-size:14px;font-weight:600}.failing-steps p.note{margin:0 0 12px;font-size:14px;color:var(--muted)}.step-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;border-top:1px solid var(--line)}.step-row:first-of-type{border-top:0}.step-name{font:14px var(--mono);overflow-wrap:anywhere}.step-count{font:14px var(--mono);color:var(--red);white-space:nowrap}
 @media(max-width:1150px){.reliability-body{grid-template-columns:minmax(0,1fr)}.reliability-body .metrics{border-right:0;border-bottom:1px solid var(--line)}}
-.volume-panel{margin-top:22px}.volume-stage{position:relative;height:460px;background:linear-gradient(180deg,#fbfcfd 0%,#eef2f5 100%);border-bottom:1px solid var(--line);overflow:hidden}.volume-stage canvas{display:block;width:100%;height:100%;cursor:grab;touch-action:none}.volume-stage canvas:active{cursor:grabbing}.volume-stage canvas:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}.volume-labels{position:absolute;inset:0;pointer-events:none}.volume-labels span{position:absolute;transform:translate(-50%,-50%);font:14px var(--mono);color:var(--muted);white-space:nowrap;background:rgba(255,255,255,.78);padding:1px 5px;border-radius:3px}.volume-labels span.axis-y{color:var(--dim);background:transparent;padding:0}.volume-tooltip{position:absolute;pointer-events:none;background:#17252e;color:#f4f6f8;padding:9px 11px;border-radius:5px;font-size:14px;line-height:1.45;max-width:320px;box-shadow:0 6px 20px rgba(23,37,46,.22)}.volume-tooltip b{display:block;font-weight:600}.volume-tooltip span{color:#b9c7cf}.volume-empty{position:absolute;inset:0;display:grid;place-content:center;margin:0;color:var(--muted);font-size:14px;text-align:center;padding:24px;background:rgba(244,246,248,.86)}.volume-empty[hidden]{display:none}.volume-legend{display:flex;gap:15px;flex-wrap:wrap;align-items:center;padding:12px 20px;font-size:14px;color:var(--muted)}.volume-legend .muted{margin-left:auto}.panel-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-@media(max-width:760px){.volume-stage{height:340px}.volume-legend .muted{margin-left:0;flex-basis:100%}}
+.volume-panel{margin-top:22px}.volume-stage{position:relative;height:460px;background:#f5ebdb;border-bottom:1px solid var(--line);overflow:hidden}.volume-stage canvas{display:block;width:100%;height:100%;cursor:grab;touch-action:none}.volume-stage canvas:active{cursor:grabbing}.volume-stage canvas:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}.volume-labels{position:absolute;inset:0;pointer-events:none}.volume-labels span{position:absolute;transform:translate(-50%,-50%);font:14px var(--mono);color:var(--muted);white-space:nowrap;background:rgba(255,255,255,.78);padding:1px 5px;border-radius:3px}.volume-labels span.axis-y{color:var(--dim);background:transparent;padding:0}.volume-tooltip{position:absolute;pointer-events:none;background:#17252e;color:#f4f6f8;padding:9px 11px;border-radius:5px;font-size:14px;line-height:1.45;max-width:320px;box-shadow:0 6px 20px rgba(23,37,46,.22)}.volume-tooltip b{display:block;font-weight:600}.volume-tooltip span{color:#b9c7cf}.volume-empty{position:absolute;inset:0;display:grid;place-content:center;margin:0;color:var(--muted);font-size:14px;text-align:center;padding:24px;background:rgba(244,246,248,.86)}.volume-empty[hidden]{display:none}.volume-legend{display:flex;gap:15px;flex-wrap:wrap;align-items:center;padding:12px 20px;font-size:14px;color:var(--muted)}.volume-legend .muted{margin-left:auto}.volume-legend .dot.good{background:#3ca064}.volume-legend .dot.danger{background:#c83c3c}.volume-legend .dot.warning{background:#f0b43c}.volume-legend .dot.neutral{background:#a09e98}.volume-controls{position:absolute;right:16px;bottom:14px;display:flex;align-items:center;gap:2px;background:#f9f3e6;border:1px solid #d9cbb0;border-radius:8px;padding:5px 8px;box-shadow:0 4px 14px rgba(70,54,30,.16)}.volume-controls button{width:32px;height:32px;display:grid;place-content:center;border:0;background:transparent;border-radius:5px;color:#2b3350;font-size:15px;line-height:1;padding:0}.volume-controls button:hover{background:#efe3ca}.volume-controls button:focus-visible{outline:2px solid #b4551f;outline-offset:1px}.volume-controls .sep{width:1px;height:18px;background:#d9cbb0;margin:0 4px}.volume-note{position:absolute;left:16px;bottom:14px;max-width:56%;background:#f9f3e6;border:1px solid #d9cbb0;border-radius:8px;padding:9px 12px;font-size:14px;color:#5a5344;box-shadow:0 4px 14px rgba(70,54,30,.16)}.volume-note b{display:block;color:#2b3350;font-weight:600;margin-bottom:3px}.volume-note[hidden]{display:none}.volume-labels span{background:rgba(249,243,230,.86);color:#5a5344}.volume-labels span.axis-y{background:transparent;color:#7a6a4c}.volume-tooltip{background:#2b3350;color:#f5ebdb;box-shadow:0 6px 20px rgba(43,51,80,.3)}.volume-tooltip span{color:#c9d2e6}.panel-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+@media(max-width:760px){.volume-stage{height:340px}.volume-legend .muted{margin-left:0;flex-basis:100%}.volume-note{display:none}.volume-controls{right:10px;bottom:10px}}
 </style>
 </head>
 <body>
@@ -39,10 +39,20 @@
   <section class="panel volume-panel" id="volume">
    <div class="panel-head"><div class="panel-title"><h2>3D execution volume</h2><span id="volume-count" class="count">—</span></div><div class="panel-actions"><span class="panel-note">Drag to orbit · scroll to zoom · shift-drag to pan</span><button class="button" id="volume-reset" type="button"><span aria-hidden="true">⟲</span> Reset view</button></div></div>
    <div class="volume-stage">
-    <canvas id="volume-canvas" tabindex="0" role="img" aria-label="3D execution volume: time runs left to right, each repository sits on its own depth plane, and every job is a bar coloured by its result. Drag to orbit, scroll to zoom, shift-drag to pan. The same data is listed in the timeline and results tables below."></canvas>
+    <canvas id="volume-canvas" tabindex="0" role="img" aria-label="3D execution volume: time runs left to right, each repository sits on its own depth plane, and every job is a cable coloured by its result. Drag to orbit, scroll to zoom, shift-drag to pan. The same data is listed in the timeline and results tables below."></canvas>
     <div class="volume-labels" id="volume-labels" aria-hidden="true"></div>
     <div class="volume-tooltip" id="volume-tooltip" role="status" aria-live="polite" hidden></div>
     <p class="volume-empty" id="volume-empty" hidden>No executions in the last 60 minutes. Only jobs with a start time and runner name appear here.</p>
+    <div class="volume-note" id="volume-note" hidden><b>How to read this</b>Time runs left to right. Each repository sits on its own depth plane, and each runner has a row on its platform. A cable is one job: it starts where the job started, ends where it finished, and its colour is the result.</div>
+    <div class="volume-controls" role="group" aria-label="3D view controls">
+     <button id="volume-left" type="button" aria-label="Rotate left" title="Rotate left"><span aria-hidden="true">↺</span></button>
+     <button id="volume-right" type="button" aria-label="Rotate right" title="Rotate right"><span aria-hidden="true">↻</span></button>
+     <span class="sep" aria-hidden="true"></span>
+     <button id="volume-out" type="button" aria-label="Zoom out" title="Zoom out"><span aria-hidden="true">−</span></button>
+     <button id="volume-in" type="button" aria-label="Zoom in" title="Zoom in"><span aria-hidden="true">+</span></button>
+     <span class="sep" aria-hidden="true"></span>
+     <button id="volume-info" type="button" aria-label="How to read this view" aria-expanded="false" title="How to read this"><span aria-hidden="true">ⓘ</span></button>
+    </div>
    </div>
    <div class="volume-legend"><span><i class="dot good"></i>Success</span><span><i class="dot danger"></i>Failed</span><span><i class="dot warning"></i>Running</span><span><i class="dot neutral"></i>Cancelled</span><span class="muted" id="volume-axis">Time on the X axis · repository depth on Z · runner rows on Y</span></div>
   </section>
@@ -82,6 +92,11 @@ function initVolume(){
  window.__ciVolume=volumeViewer;
  volumeViewer.on('hover',box=>showVolumeTooltip(box)).on('select',box=>showVolumeTooltip(box,true));
  $('volume-reset').addEventListener('click',()=>{volumeViewer.reset();updateVolumeLabels();});
+ $('volume-left').addEventListener('click',()=>{volumeViewer.rotate(0.35);updateVolumeLabels();});
+ $('volume-right').addEventListener('click',()=>{volumeViewer.rotate(-0.35);updateVolumeLabels();});
+ $('volume-out').addEventListener('click',()=>{volumeViewer.zoomBy(220);updateVolumeLabels();});
+ $('volume-in').addEventListener('click',()=>{volumeViewer.zoomBy(-220);updateVolumeLabels();});
+ $('volume-info').addEventListener('click',()=>{const note=$('volume-note');note.hidden=!note.hidden;$('volume-info').setAttribute('aria-expanded',String(!note.hidden));});
  window.addEventListener('resize',()=>{volumeViewer.draw();updateVolumeLabels();});
 }
 function showVolumeTooltip(box,sticky){
@@ -100,8 +115,9 @@ function updateVolumeLabels(){
  const host=$('volume-labels');
  const layout=volumeViewer.getLayout();
  const parts=[];
- layout.ticks.forEach(tick=>{const point=volumeViewer.projectToScreen([tick.x,-3,layout.bounds.maxZ+14]);if(point&&point.visible)parts.push('<span style="left:'+point.x.toFixed(1)+'px;top:'+point.y.toFixed(1)+'px">'+esc(tick.label)+'</span>');});
- layout.planes.forEach(plane=>{const point=volumeViewer.projectToScreen([0,-3,plane.z+7]);if(point&&point.visible)parts.push('<span class="axis-y" style="left:'+point.x.toFixed(1)+'px;top:'+point.y.toFixed(1)+'px">'+esc(plane.repo)+'</span>');});
+ const base=layout.bounds.maxZ+15;
+ layout.ticks.forEach(tick=>{const point=volumeViewer.projectToScreen([tick.x,0,base]);if(point&&point.visible)parts.push('<span style="left:'+point.x.toFixed(1)+'px;top:'+point.y.toFixed(1)+'px">'+esc(tick.label)+'</span>');});
+ layout.planes.forEach(plane=>{const point=volumeViewer.projectToScreen([0,0,plane.z+7]);if(point&&point.visible)parts.push('<span class="axis-y" style="left:'+point.x.toFixed(1)+'px;top:'+point.y.toFixed(1)+'px">'+esc(plane.repo)+'</span>');});
  host.innerHTML=parts.join('');
 }
 function renderVolume(jobs){
