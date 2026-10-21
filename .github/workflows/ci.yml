@@ -46,7 +46,7 @@ jobs:
           & $exe --self-test-report $report
           $result = Get-Content $report -Raw | ConvertFrom-Json
           Get-Content $report -Raw
-          if (-not ($result.dpapi_encrypted -and $result.dpapi_roundtrip -and $result.dashboard_bundled -and $result.dashboard_english -and $result.frozen)) {
+          if (-not ($result.dpapi_encrypted -and $result.dpapi_roundtrip -and $result.dashboard_bundled -and $result.dashboard_english -and $result.viewer_bundled -and $result.frozen)) {
             throw 'Packaged application self-test failed'
           }
       - name: Verify native setup and WebView2 dashboard
@@ -75,6 +75,14 @@ jobs:
           }
           if (-not ($ui.window -and $ui.body)) {
             throw 'WebView2 dashboard verification failed'
+          }
+          if (-not $ui.volume.present) {
+            throw 'The 3D execution volume is missing from the packaged dashboard'
+          }
+          if (-not $ui.volume.webgl) {
+            # A CI runner has no GPU, so WebGL2 may be unavailable there.
+            # The dashboard must still work and fall back to the flat views.
+            Write-Warning 'This runner has no WebGL2 context; the 3D view will fall back to the flat tables.'
           }
       - name: Upload verified installer
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

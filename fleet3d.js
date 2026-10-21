@@ -568,23 +568,33 @@
 
     let program;
     let lineProgram;
+    let boxBuffer;
+    let boxColorBuffer;
+    let lineBuffer;
+    let positionLocation;
+    let colorLocation;
+    let linePositionLocation;
+    let mvpLocation;
+    let alphaLocation;
+    let lineMvpLocation;
+    let lineColorLocation;
     try {
       program = link(gl, VERTEX_SHADER, FRAGMENT_SHADER);
       lineProgram = link(gl, LINE_VERTEX_SHADER, LINE_FRAGMENT_SHADER);
+      boxBuffer = gl.createBuffer();
+      boxColorBuffer = gl.createBuffer();
+      lineBuffer = gl.createBuffer();
+      positionLocation = gl.getAttribLocation(program, 'aPosition');
+      colorLocation = gl.getAttribLocation(program, 'aColor');
+      linePositionLocation = gl.getAttribLocation(lineProgram, 'aPosition');
+      mvpLocation = gl.getUniformLocation(program, 'uMVP');
+      alphaLocation = gl.getUniformLocation(program, 'uAlpha');
+      lineMvpLocation = gl.getUniformLocation(lineProgram, 'uMVP');
+      lineColorLocation = gl.getUniformLocation(lineProgram, 'uColor');
     } catch (error) {
+      // A partial or broken WebGL implementation must not break the dashboard.
       return null;
     }
-
-    const boxBuffer = gl.createBuffer();
-    const boxColorBuffer = gl.createBuffer();
-    const lineBuffer = gl.createBuffer();
-    const positionLocation = gl.getAttribLocation(program, 'aPosition');
-    const colorLocation = gl.getAttribLocation(program, 'aColor');
-    const linePositionLocation = gl.getAttribLocation(lineProgram, 'aPosition');
-    const mvpLocation = gl.getUniformLocation(program, 'uMVP');
-    const alphaLocation = gl.getUniformLocation(program, 'uAlpha');
-    const lineMvpLocation = gl.getUniformLocation(lineProgram, 'uMVP');
-    const lineColorLocation = gl.getUniformLocation(lineProgram, 'uColor');
 
     const camera = createCamera();
     let layout = buildLayout([], {now: Date.now()});

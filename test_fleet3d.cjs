@@ -315,6 +315,21 @@ test('framing respects the aspect ratio it is given', () => {
 
 // --- integration with the dashboard ----------------------------------------
 
+test('the viewer gives up cleanly when the browser has no WebGL2', () => {
+  const fakeCanvas = {getContext: () => null};
+  assert.equal(Fleet3D.createViewer(fakeCanvas), null);
+});
+
+test('the viewer gives up cleanly when there is no canvas at all', () => {
+  assert.equal(Fleet3D.createViewer(null), null);
+  assert.equal(Fleet3D.createViewer(undefined), null);
+});
+
+test('the viewer gives up cleanly when the canvas cannot be created', () => {
+  const fakeCanvas = {getContext: () => ({})};
+  assert.equal(Fleet3D.createViewer(fakeCanvas), null);
+});
+
 test('the dashboard loads the 3D engine as a same-origin script', () => {
   assert.match(html, /<script src="fleet3d\.js"><\/script>/);
 });
