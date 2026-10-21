@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-10-21
+
+### Fixed
+
+- Relaunching straight after an auto-update could fail to create the dashboard window with `RPC_E_CALL_REJECTED` (`0x8001010d`). The old process is terminated by the installer, but its WebView2 COM server can still be registered a moment later, so the new window was initialised against a COM object that was on its way out. The update helper now waits a few seconds between installing and relaunching, and the application recovers instead of logging a fatal exception.
+
 ## [1.3.0] - 2026-10-20
 
 ### Added
