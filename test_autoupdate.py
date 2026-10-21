@@ -67,6 +67,26 @@ class AutoUpdateTests(unittest.TestCase):
         self.assertIn('/NORESTART', script)
         self.assertIn('/SUPPRESSMSGBOXES', script)
 
+    def test_the_helper_waits_before_relaunching(self):
+        # The old process is killed by the installer, but its WebView2 COM
+        # server can outlive it by a moment. Relaunching too early makes the
+        # new window fail with RPC_E_CALL_REJECTED (0x8001010d).
+        content = b'installer-bytes'
+        digest = hashlib.sha256(content).hexdigest()
+        sums = io.BytesIO(f'{digest}  CI-Operations-Setup.exe\n'.encode())
+        with patch.object(desktop_app.urllib.request, 'urlopen', side_effect=[release('v99.0.0', ASSET + SUMS_ASSET), sums]), \
+             patch.object(desktop_app.urllib.request, 'urlretrieve', side_effect=download_fake(content)), \
+             patch.object(desktop_app.subprocess, 'Popen') as popen, \
+             patch.object(desktop_app.subprocess, 'run'):
+            self.assertEqual(desktop_app.run_auto_update(), 2)
+        script = Path(popen.call_args.args[0][2]).read_text(encoding='utf-8')
+        lines = [line.strip() for line in script.splitlines() if line.strip()]
+        install = next(i for i, line in enumerate(lines) if '/VERYSILENT' in line)
+        relaunch = next(i for i, line in enumerate(lines) if line.startswith('start'))
+        waits = [i for i, line in enumerate(lines) if line.startswith('ping')]
+        self.assertTrue(any(install < i < relaunch for i in waits),
+                        'the helper must wait between installing and relaunching')
+
     def test_checksum_mismatch_aborts_before_installing(self):
         sums = io.BytesIO(b'0' * 64 + b'  CI-Operations-Setup.exe\n')
         with patch.object(desktop_app.urllib.request, 'urlopen', side_effect=[release('v99.0.0', ASSET + SUMS_ASSET), sums]), \

@@ -133,6 +133,11 @@ def _schedule_detached_install(installer_path):
     The installer replaces CI-Operations.exe. Running it inline makes Inno Setup
     try to close the very process that is waiting on it, which aborts the
     install with exit code 5. A short-lived detached helper avoids that.
+
+    The helper also waits before relaunching. The old process is terminated by
+    the installer, but its WebView2 COM server can still be registered a moment
+    later, and the new window then fails to initialise with RPC_E_CALL_REJECTED
+    (0x8001010d). A short pause lets that COM object go away.
     """
     frozen = bool(getattr(sys, 'frozen', False))
     relaunch = [sys.executable] if frozen else [sys.executable, str(Path(__file__).with_name('desktop_app.py'))]
@@ -141,6 +146,7 @@ def _schedule_detached_install(installer_path):
         '@echo off',
         'ping -n 4 127.0.0.1 >nul',
         f'"{installer_path}" /VERYSILENT /NORESTART /SUPPRESSMSGBOXES',
+        'ping -n 8 127.0.0.1 >nul',
         f'start "" {subprocess.list2cmdline(relaunch)}',
     ]
     batch.write_text('\r\n'.join(lines) + '\r\n', encoding='utf-8')
