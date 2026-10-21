@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-10-21
+
+### Changed
+
+- The 3D execution volume is now drawn as an isometric technical illustration. The camera is orthographic at the true isometric angle, so nothing shrinks with distance, the ground is a warm parchment, and every solid carries a dark outline with three flat shading tones instead of a smooth surface.
+- A job is drawn as a cable that arcs from the moment it started to the moment it finished, with a block marking where it started. The cable's colour is the result, so a run of failures reads as a shape rather than a number.
+- Each repository sits on its own slab, with faint circuit-trace artwork behind the whole scene and an isometric ground grid for the time axis and the runner rows.
+- A floating control bar in the corner of the view rotates the scene, zooms it and opens a short "how to read this" note. The keyboard shortcuts still work.
+
+### Fixed
+
+- Hovering and clicking no longer picked the wrong job. The pointer ray for an orthographic camera is now built from the camera's own axes, so it agrees with what is drawn.
+
 ## [1.3.1] - 2026-10-21
 
 ### Fixed
