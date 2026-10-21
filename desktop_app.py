@@ -225,6 +225,7 @@ def self_test(report):
     Path(report).write_text(json.dumps({'dpapi_encrypted': encrypted, 'dpapi_roundtrip': roundtrip,
                                         'dashboard_bundled': resource('index.html').is_file(),
                                         'dashboard_english': not any(0x0E00 <= ord(c) <= 0x0E7F for c in resource('index.html').read_text(encoding='utf-8')),
+                                        'viewer_bundled': resource('fleet3d.js').is_file(),
                                         'frozen': bool(getattr(sys, 'frozen', False))}), encoding='utf-8')
 
 
@@ -281,7 +282,7 @@ def run_dashboard(settings, smoke_report=None):
                   MenuAction('Exit', window.destroy)])]
 
     def smoke():
-        outcome = {'window': False}
+        outcome: dict = {'window': False}
         try:
             for _ in range(80):
                 try:
@@ -291,7 +292,17 @@ def run_dashboard(settings, smoke_report=None):
                 except Exception:
                     pass
                 time.sleep(.15)
-            Path(smoke_report).write_text(json.dumps(outcome), encoding='utf-8')
+            # The 3D view must be present and, where WebGL2 exists, actually drawn.
+            volume = {'present': False}
+            try:
+                found = window.evaluate_js("(() => {const c=document.getElementById('volume-canvas');if(!c)return {present:false};const gl=c.getContext('webgl2');return {present:true,webgl:!!gl,width:c.width,height:c.height,labels:document.getElementById('volume-labels').children.length};})()")
+                if isinstance(found, dict):
+                    volume = found
+            except Exception:
+                pass
+            report = dict(outcome) if isinstance(outcome, dict) else {}
+            report['volume'] = volume
+            Path(smoke_report).write_text(json.dumps(report), encoding='utf-8')
         finally:
             window.destroy()
 

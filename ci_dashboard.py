@@ -137,6 +137,10 @@ class H(BaseHTTPRequestHandler):
             with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'index.html'), 'rb') as source:
                 body = source.read()
             ct = 'text/html; charset=utf-8'
+        elif path == '/fleet3d.js':
+            with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fleet3d.js'), 'rb') as source:
+                body = source.read()
+            ct = 'text/javascript; charset=utf-8'
         else:
             self.send_error(404)
             return

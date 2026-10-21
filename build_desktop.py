@@ -39,7 +39,8 @@ def main():
     make_icon()
     subprocess.run([sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean', '--onedir',
                     '--windowed', '--name', 'CI-Operations', '--icon', str(ROOT / 'app.ico'),
-                    '--add-data', f'{ROOT / "index.html"};.', '--add-data', f'{ROOT / "app.ico"};.',
+                    '--add-data', f'{ROOT / "index.html"};.', '--add-data', f'{ROOT / "fleet3d.js"};.',
+                    '--add-data', f'{ROOT / "app.ico"};.',
                     '--collect-all', 'webview', '--hidden-import', 'webview.platforms.edgechromium',
                     '--hidden-import', 'webview.platforms.winforms', str(ROOT / 'desktop_app.py')],
                    cwd=ROOT, check=True)

@@ -12,6 +12,8 @@
 .right-stack{display:grid;gap:20px;min-width:0}.repo-row{padding:16px 20px;border-bottom:1px solid var(--line)}.repo-row:last-child{border-bottom:0}.repo-title{font:14px var(--mono);overflow-wrap:anywhere;margin-bottom:9px}.repo-stats{display:flex;gap:12px;flex-wrap:wrap;font-size:14px;color:var(--muted)}
 .reliability-body{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0}.reliability-body .metrics{border-right:1px solid var(--line)}.reliability-body .metrics .metric:last-child{border-right:0}.failing-steps{padding:18px 20px;min-width:0}.failing-steps h3{margin:0 0 4px;font-size:14px;font-weight:600}.failing-steps p.note{margin:0 0 12px;font-size:14px;color:var(--muted)}.step-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;border-top:1px solid var(--line)}.step-row:first-of-type{border-top:0}.step-name{font:14px var(--mono);overflow-wrap:anywhere}.step-count{font:14px var(--mono);color:var(--red);white-space:nowrap}
 @media(max-width:1150px){.reliability-body{grid-template-columns:minmax(0,1fr)}.reliability-body .metrics{border-right:0;border-bottom:1px solid var(--line)}}
+.volume-panel{margin-top:22px}.volume-stage{position:relative;height:460px;background:linear-gradient(180deg,#fbfcfd 0%,#eef2f5 100%);border-bottom:1px solid var(--line);overflow:hidden}.volume-stage canvas{display:block;width:100%;height:100%;cursor:grab;touch-action:none}.volume-stage canvas:active{cursor:grabbing}.volume-stage canvas:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}.volume-labels{position:absolute;inset:0;pointer-events:none}.volume-labels span{position:absolute;transform:translate(-50%,-50%);font:14px var(--mono);color:var(--muted);white-space:nowrap;background:rgba(255,255,255,.78);padding:1px 5px;border-radius:3px}.volume-labels span.axis-y{color:var(--dim);background:transparent;padding:0}.volume-tooltip{position:absolute;pointer-events:none;background:#17252e;color:#f4f6f8;padding:9px 11px;border-radius:5px;font-size:14px;line-height:1.45;max-width:320px;box-shadow:0 6px 20px rgba(23,37,46,.22)}.volume-tooltip b{display:block;font-weight:600}.volume-tooltip span{color:#b9c7cf}.volume-empty{position:absolute;inset:0;display:grid;place-content:center;margin:0;color:var(--muted);font-size:14px;text-align:center;padding:24px;background:rgba(244,246,248,.86)}.volume-legend{display:flex;gap:15px;flex-wrap:wrap;align-items:center;padding:12px 20px;font-size:14px;color:var(--muted)}.volume-legend .muted{margin-left:auto}.panel-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+@media(max-width:760px){.volume-stage{height:340px}.volume-legend .muted{margin-left:0;flex-basis:100%}}
 </style>
 </head>
 <body>
@@ -20,7 +22,7 @@
 <aside class="sidebar" aria-label="Navigation">
  <div class="brand"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span><strong>CI Operations</strong></div>
  <div class="workspace"><div class="overline">Workspace</div><strong>GitHub Actions</strong><div class="muted small">Runner observability</div></div>
- <nav class="nav"><a href="#main" aria-label="Overview"><span class="nav-symbol" aria-hidden="true">▦</span>Overview</a><a href="#fleet" aria-label="Runner fleet"><span class="nav-symbol" aria-hidden="true">▤</span>Runner fleet</a><a href="#activity" aria-label="Timeline"><span class="nav-symbol" aria-hidden="true">≋</span>Activity timeline</a><a href="#history" aria-label="Job history"><span class="nav-symbol" aria-hidden="true">↗</span>Job history</a></nav>
+ <nav class="nav"><a href="#main" aria-label="Overview"><span class="nav-symbol" aria-hidden="true">▦</span>Overview</a><a href="#fleet" aria-label="Runner fleet"><span class="nav-symbol" aria-hidden="true">▤</span>Runner fleet</a><a href="#volume" aria-label="3D execution volume"><span class="nav-symbol" aria-hidden="true">◈</span>3D volume</a><a href="#activity" aria-label="Timeline"><span class="nav-symbol" aria-hidden="true">≋</span>Activity timeline</a><a href="#history" aria-label="Job history"><span class="nav-symbol" aria-hidden="true">↗</span>Job history</a></nav>
  <div class="side-foot"><div class="overline">Data source</div><strong>GitHub REST API</strong><p>Read-only monitoring</p><p>Browser refresh · 10s</p><p>Timezone · system local</p></div>
 </aside>
 <div class="main">
@@ -34,6 +36,16 @@
    <section class="panel" id="fleet"><div class="panel-head"><div class="panel-title"><h2>Runner fleet</h2><span id="runner-count" class="count">—</span></div><div class="legend"><span><i class="dot good"></i>Idle</span><span><i class="dot warning"></i>Busy</span><span><i class="dot danger"></i>Offline</span></div></div><div id="runners" class="fleet-grid"></div></section>
    <div class="right-stack"><section class="panel" id="queue-panel"><div class="panel-head"><div class="panel-title"><h2>Pending jobs</h2><span id="queue-count" class="count">—</span></div><span class="panel-note">Oldest first</span></div><div id="queue"></div></section><section class="panel repository-panel"><div class="panel-head"><h2>Repository health</h2><span class="panel-note">Current selection</span></div><div id="repo-health"></div></section></div>
   </div>
+  <section class="panel volume-panel" id="volume">
+   <div class="panel-head"><div class="panel-title"><h2>3D execution volume</h2><span id="volume-count" class="count">—</span></div><div class="panel-actions"><span class="panel-note">Drag to orbit · scroll to zoom · shift-drag to pan</span><button class="button" id="volume-reset" type="button"><span aria-hidden="true">⟲</span> Reset view</button></div></div>
+   <div class="volume-stage">
+    <canvas id="volume-canvas" tabindex="0" role="img" aria-label="3D execution volume: time runs left to right, each repository sits on its own depth plane, and every job is a bar coloured by its result. Drag to orbit, scroll to zoom, shift-drag to pan. The same data is listed in the timeline and results tables below."></canvas>
+    <div class="volume-labels" id="volume-labels" aria-hidden="true"></div>
+    <div class="volume-tooltip" id="volume-tooltip" role="status" aria-live="polite" hidden></div>
+    <p class="volume-empty" id="volume-empty" hidden>No executions in the last 60 minutes. Only jobs with a start time and runner name appear here.</p>
+   </div>
+   <div class="volume-legend"><span><i class="dot good"></i>Success</span><span><i class="dot danger"></i>Failed</span><span><i class="dot warning"></i>Running</span><span><i class="dot neutral"></i>Cancelled</span><span class="muted" id="volume-axis">Time on the X axis · repository depth on Z · runner rows on Y</span></div>
+  </section>
   <section class="panel timeline-panel" id="activity"><div class="panel-head"><div class="panel-title"><h2>Execution timeline</h2><span class="count">60 MIN</span></div><div class="legend"><span><i class="dot good"></i>Success</span><span><i class="dot danger"></i>Failed</span><span><i class="dot warning"></i>Running</span></div></div><div class="timeline-wrap"><div id="gantt" class="timeline"></div></div></section>
   <section class="panel reliability-panel" id="reliability"><div class="panel-head"><div class="panel-title"><h2>Reliability</h2><span id="reliability-window" class="count">24H</span></div><div class="panel-actions"><span class="panel-note">Stored locally · survives restarts</span><button class="button" id="export" type="button"><span aria-hidden="true">⭳</span> Export CSV</button></div></div><div class="reliability-body"><div id="reliability-metrics" class="metrics"></div><div id="failing-steps" class="failing-steps"></div></div></section>
   <section class="panel results-panel" id="history"><div class="panel-head"><div class="panel-title"><h2>Recent executions</h2><span id="done-count" class="count">—</span></div><span class="panel-note">Latest 25 jobs · excluding skipped</span></div><div id="done"></div></section>
@@ -41,6 +53,7 @@
  </main>
 </div>
 </div>
+<script src="fleet3d.js"></script>
 <script>
 let S=null,loading=false,connectionError=false;
 const $=id=>document.getElementById(id);
@@ -58,6 +71,46 @@ function safeState(data){return {...data,runners:data.runners.map(r=>({...r})),j
 const empty=(title,note='')=>`<div class="empty"><span class="empty-mark" aria-hidden="true">—</span>${title}${note?`<small>${note}</small>`:''}</div>`;
 const timer=value=>`<span class="t" data-s="${esc(value||'')}">${dur(now()-stamp(value))}</span>`;
 function filteredState(){const repo=$('repo').value,term=$('search').value.toLowerCase().trim();const matches=x=>(!repo||x.repo===repo)&&(!term||[x.name,x.runner,x.branch,x.repo,x.workflow,x.pr].join(' ').toLowerCase().includes(term));return {...S,runners:S.runners.filter(matches),jobs:S.jobs.filter(matches)};}
+let volumeViewer=null,volumeReady=false,volumeLabelsPending=false;
+function volumeSupported(){return typeof Fleet3D!=='undefined'&&typeof Fleet3D.createViewer==='function';}
+function initVolume(){
+ if(volumeViewer||!volumeSupported())return;
+ const canvas=$('volume-canvas');
+ if(!canvas||!canvas.getContext)return;
+ volumeViewer=Fleet3D.createViewer(canvas);
+ if(!volumeViewer){$('volume-empty').hidden=false;$('volume-empty').textContent='This browser cannot render the 3D view. The timeline and results tables below show the same executions.';return;}
+ volumeViewer.on('hover',box=>showVolumeTooltip(box)).on('select',box=>showVolumeTooltip(box,true));
+ $('volume-reset').addEventListener('click',()=>{volumeViewer.reset();updateVolumeLabels();});
+ window.addEventListener('resize',()=>{volumeViewer.draw();updateVolumeLabels();});
+}
+function showVolumeTooltip(box,sticky){
+ const tip=$('volume-tooltip');
+ if(!box){tip.hidden=true;return;}
+ const job=box.job||{};
+ tip.innerHTML='<b>'+esc(job.name||'Job')+'</b><span>'+esc(box.repo+' · '+(box.runner||'—'))+'</span><span>'+esc((job.workflow||'workflow')+' · '+(box.conclusion||job.status||'unknown'))+'</span>';
+ tip.hidden=false;
+ const stage=$('volume-canvas').parentElement.getBoundingClientRect();
+ const canvas=$('volume-canvas').getBoundingClientRect();
+ const point=volumeViewer.projectToScreen([(box.x0+box.x1)/2,box.y+0.6,box.z]);
+ if(point){tip.style.left=Math.min(Math.max(8,point.x-110),canvas.width-330)+'px';tip.style.top=Math.max(8,point.y-72)+'px';}
+}
+function updateVolumeLabels(){
+ if(!volumeViewer)return;
+ const host=$('volume-labels');
+ const layout=volumeViewer.getLayout();
+ const parts=[];
+ layout.ticks.forEach(tick=>{const point=volumeViewer.projectToScreen([tick.x,-3,layout.bounds.maxZ+14]);if(point&&point.visible)parts.push('<span style="left:'+point.x.toFixed(1)+'px;top:'+point.y.toFixed(1)+'px">'+esc(tick.label)+'</span>');});
+ layout.planes.forEach(plane=>{const point=volumeViewer.projectToScreen([0,-3,plane.z+7]);if(point&&point.visible)parts.push('<span class="axis-y" style="left:'+point.x.toFixed(1)+'px;top:'+point.y.toFixed(1)+'px">'+esc(plane.repo)+'</span>');});
+ host.innerHTML=parts.join('');
+}
+function renderVolume(jobs){
+ if(!volumeViewer)return;
+ volumeViewer.setJobs(jobs,{now:now(),windowMs:3600000});
+ const layout=volumeViewer.getLayout();
+ $('volume-count').textContent=layout.boxes.length+' EXEC';
+ $('volume-empty').hidden=layout.boxes.length>0;
+ updateVolumeLabels();
+}
 function render(){if(!S)return;const V=filteredState(),running=V.jobs.filter(j=>j.status==='in_progress');
  const names=new Map(V.runners.map(r=>[runnerKey(r),r]));
  running.forEach(j=>{if(j.runner&&!names.has(runnerKey(j)))names.set(runnerKey(j),{name:j.runner,repo:j.repo,status:'online',busy:true,inferred:true})});
@@ -87,6 +140,7 @@ function render(){if(!S)return;const V=filteredState(),running=V.jobs.filter(j=>
  $('health').textContent=offline?offline+' runner(s) offline · check fleet':fleet.length?'No offline runners in the current selection':'No runner data available';
  $('health').className='health-pill '+(offline?'warning':fleet.length?'good':'neutral');
  $('err').innerHTML=S.error?'<div class="err">Data may be incomplete: '+esc(S.error)+'</div>':'';tick();
+ renderVolume(V.jobs);
 }
 function renderReliability(data){
  const R=data||{total:0,failed:0,successes:0,success_rate:null,workflows:[],failing_steps:[]};
@@ -105,7 +159,7 @@ function tick(){if(!S)return;document.querySelectorAll('[data-s]').forEach(e=>e.
 async function load(){if(loading)return;loading=true;$('refresh').disabled=true;try{const response=await fetch('/api/state',{signal:AbortSignal.timeout(15000),cache:'no-store'});if(!response.ok)throw Error('HTTP '+response.status);const data=await response.json();if(!data||!Array.isArray(data.jobs)||!Array.isArray(data.runners))throw Error('Invalid response format');S=safeState(data);connectionError=false;const select=$('repo'),chosen=select.value,repos=[...new Set([...S.jobs,...S.runners].map(x=>x.repo).filter(Boolean))].sort();select.innerHTML='<option value="">All repositories</option>'+repos.map(r=>`<option value="${esc(r)}">${esc(r)}</option>`).join('');select.value=repos.includes(chosen)?chosen:'';render();loadHistory();}catch(error){connectionError=true;$('connection').textContent='Connection failed · retrying in 10 seconds';$('err').innerHTML='<div class="err">Could not load data: '+esc(error.message)+(S?' · Showing last received data':'')+'</div>';$('health').textContent='Connection failed · status cannot be confirmed';$('health').className='health-pill warning';}finally{loading=false;$('refresh').disabled=false;}}
 async function loadHistory(){try{const windowName=($('window')&&$('window').value)||'24h';const response=await fetch('/api/history',{signal:AbortSignal.timeout(15000),cache:'no-store',headers:{'X-History-Window':windowName}});if(!response.ok)throw Error('HTTP '+response.status);const data=await response.json();renderReliability(data.summary||data);}catch(error){renderReliability(null);}}
 function exportHistory(){const windowName=($('window')&&$('window').value)||'24h';const link=document.createElement('a');link.href='/api/history.csv?window='+encodeURIComponent(windowName);link.download='ci-operations-history-'+windowName+'.csv';document.body.appendChild(link);link.click();link.remove();}
-$('search').addEventListener('input',render);$('repo').addEventListener('change',render);$('window').addEventListener('change',loadHistory);$('refresh').addEventListener('click',load);$('export').addEventListener('click',exportHistory);load();setInterval(load,10000);setInterval(tick,1000);
+$('search').addEventListener('input',render);$('repo').addEventListener('change',render);$('window').addEventListener('change',loadHistory);$('refresh').addEventListener('click',load);$('export').addEventListener('click',exportHistory);initVolume();load();setInterval(load,10000);setInterval(tick,1000);
 </script>
 </body>
 </html>

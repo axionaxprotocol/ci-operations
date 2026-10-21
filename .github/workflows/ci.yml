@@ -33,7 +33,7 @@ jobs:
       - name: Run Python and native Windows tests
         run: python -m unittest discover -p 'test_*.py' -v
       - name: Run frontend tests
-        run: node --test test_frontend.cjs
+        run: node --test test_frontend.cjs test_fleet3d.cjs
       - name: Install packaging dependencies
         run: python -m pip install -r requirements-desktop.txt
       - name: Build Windows application
