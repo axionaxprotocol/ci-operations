@@ -258,6 +258,61 @@ test('the camera can be reset to its default view', () => {
   assert.equal(camera.distance, Fleet3D.createCamera().distance);
 });
 
+test('framing points the camera at the middle of the data', () => {
+  const layout = Fleet3D.buildLayout([job()], {now: NOW, windowMs: WINDOW});
+  const camera = Fleet3D.createCamera();
+  Fleet3D.frameLayout(camera, layout);
+  const b = layout.bounds;
+  assert.ok(Math.abs(camera.target[0] - (b.minX + b.maxX) / 2) < 1e-6);
+  assert.ok(Math.abs(camera.target[1] - (b.minY + b.maxY) / 2) < 1e-6);
+  assert.ok(Math.abs(camera.target[2] - (b.minZ + b.maxZ) / 2) < 1e-6);
+});
+
+test('framing pulls the camera back far enough to see the whole volume', () => {
+  const layout = Fleet3D.buildLayout([job()], {now: NOW, windowMs: WINDOW});
+  const camera = Fleet3D.createCamera();
+  Fleet3D.frameLayout(camera, layout);
+  const span = layout.bounds.maxX - layout.bounds.minX;
+  assert.ok(camera.distance > span, 'the camera must be far enough back to fit the time axis');
+  assert.ok(camera.distance <= Fleet3D.MAX_DISTANCE);
+});
+
+test('framing a tiny scene does not put the camera inside it', () => {
+  const layout = Fleet3D.buildLayout([], {now: NOW, windowMs: WINDOW});
+  const camera = Fleet3D.createCamera();
+  Fleet3D.frameLayout(camera, layout);
+  assert.ok(camera.distance >= Fleet3D.MIN_DISTANCE);
+});
+
+test('framing makes the volume fill the frame instead of sitting in a corner', () => {
+  const layout = Fleet3D.buildLayout([
+    job(), job({repo: 'o/b', runner: 'w9'}), job({runner: 'w2'}),
+  ], {now: NOW, windowMs: WINDOW});
+  const camera = Fleet3D.createCamera();
+  Fleet3D.frameLayout(camera, layout, 2.1);
+  const mvp = Fleet3D.viewProjection(camera, 2.1);
+  const b = layout.bounds;
+  const corners = [];
+  [b.minX, b.maxX].forEach(x => [b.minY, b.maxY].forEach(y =>
+    [b.minZ, b.maxZ].forEach(z => corners.push([x, y, z]))));
+  let extent = 0;
+  corners.forEach(c => {
+    const p = Fleet3D.mat4.project(mvp, c);
+    if (p.visible) extent = Math.max(extent, Math.abs(p.x), Math.abs(p.y));
+  });
+  assert.ok(extent > 0.6, 'the volume must fill the frame, got ' + extent.toFixed(3));
+  assert.ok(extent <= 0.95, 'the volume must not overflow the frame, got ' + extent.toFixed(3));
+});
+
+test('framing respects the aspect ratio it is given', () => {
+  const layout = Fleet3D.buildLayout([job()], {now: NOW, windowMs: WINDOW});
+  const wide = Fleet3D.createCamera();
+  const tall = Fleet3D.createCamera();
+  Fleet3D.frameLayout(wide, layout, 3);
+  Fleet3D.frameLayout(tall, layout, 0.8);
+  assert.notEqual(Math.round(wide.distance), Math.round(tall.distance));
+});
+
 // --- integration with the dashboard ----------------------------------------
 
 test('the dashboard loads the 3D engine as a same-origin script', () => {

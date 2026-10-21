@@ -23,8 +23,10 @@
   const MAX_DISTANCE = 900;
   const ROW_HEIGHT = 3.2;
   const PLANE_DEPTH = 14;
-  const BAR_THICKNESS = 1.1;
+  const BAR_HEIGHT = 1.35;
+  const BAR_DEPTH = 2.4;
   const MIN_BAR_LENGTH = 0.6;
+  const FRAME_FILL = 0.84;
 
   // Palette matches the dashboard: green success, amber running, red failed.
   const COLORS = {
@@ -381,6 +383,52 @@
     return camera;
   }
 
+  /**
+   * Point the camera at the middle of the data and pull back until the whole
+   * volume fits the frame, so a scene with one job and a scene with a hundred
+   * both fill the canvas.
+   */
+  function frameLayout(camera, layout, aspect) {
+    const bounds = layout.bounds;
+    const centreX = (bounds.minX + bounds.maxX) / 2;
+    const centreY = (bounds.minY + bounds.maxY) / 2;
+    const centreZ = (bounds.minZ + bounds.maxZ) / 2;
+    camera.target = [centreX, centreY, centreZ];
+
+    const corners = [];
+    [bounds.minX, bounds.maxX].forEach(function (x) {
+      [bounds.minY, bounds.maxY].forEach(function (y) {
+        [bounds.minZ, bounds.maxZ].forEach(function (z) { corners.push([x, y, z]); });
+      });
+    });
+
+    const ratio = aspect > 0 ? aspect : 1;
+    const spanX = Math.max(1, bounds.maxX - bounds.minX);
+    const spanY = Math.max(1, bounds.maxY - bounds.minY);
+    const spanZ = Math.max(1, bounds.maxZ - bounds.minZ);
+    let distance = Math.max(MIN_DISTANCE, Math.min(MAX_DISTANCE,
+      Math.sqrt(spanX * spanX + spanY * spanY + spanZ * spanZ) / 2 * 2.1));
+
+    // The projected size shrinks roughly with distance, so a few rounds of
+    // scaling land the volume inside the frame whatever its shape.
+    for (let round = 0; round < 6; round++) {
+      camera.distance = distance;
+      const mvp = viewProjection(camera, ratio);
+      let extent = 0;
+      corners.forEach(function (corner) {
+        const projected = mat4.project(mvp, corner);
+        if (!projected.visible) return;
+        extent = Math.max(extent, Math.abs(projected.x), Math.abs(projected.y));
+      });
+      if (!extent) break;
+      const scale = extent / FRAME_FILL;
+      if (Math.abs(scale - 1) < 0.01) break;
+      distance = Math.max(MIN_DISTANCE, Math.min(MAX_DISTANCE, distance * scale));
+    }
+    camera.distance = distance;
+    return camera;
+  }
+
   function cameraEye(camera) {
     const cosPitch = Math.cos(camera.pitch);
     return [
@@ -460,8 +508,8 @@
 
   function boxVertices(box) {
     const x0 = box.x0, x1 = box.x1;
-    const y0 = box.y, y1 = box.y + BAR_THICKNESS;
-    const z0 = box.z, z1 = box.z + BAR_THICKNESS;
+    const y0 = box.y, y1 = box.y + BAR_HEIGHT;
+    const z0 = box.z, z1 = box.z + BAR_DEPTH;
     const color = box.color;
     const corners = [
       [x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0],
@@ -586,6 +634,12 @@
       gl.viewport(0, 0, canvas.width, canvas.height);
     }
 
+    function currentAspect() {
+      const width = canvas.clientWidth || canvas.width || 1;
+      const height = canvas.clientHeight || canvas.height || 1;
+      return height > 0 ? width / height : 1;
+    }
+
     function draw() {
       if (disposed) return;
       resize();
@@ -624,7 +678,7 @@
     function boxBounds(box) {
       return {
         min: [box.x0, box.y, box.z],
-        max: [box.x1, box.y + BAR_THICKNESS, box.z + BAR_THICKNESS],
+        max: [box.x1, box.y + BAR_HEIGHT, box.z + BAR_DEPTH],
       };
     }
 
@@ -765,6 +819,7 @@
         uploadLines();
         hovered = null;
         selected = null;
+        frameLayout(camera, layout, currentAspect());
         draw();
         notify('hover', null);
         notify('select', null);
@@ -777,7 +832,7 @@
         uploadLines();
         draw();
       },
-      reset: function () { resetCamera(camera); draw(); },
+      reset: function () { resetCamera(camera); frameLayout(camera, layout, currentAspect()); draw(); },
       draw: draw,
       pickAt: pickAt,
       projectToScreen: projectToScreen,
@@ -811,6 +866,7 @@
     zoom: zoom,
     pan: pan,
     resetCamera: resetCamera,
+    frameLayout: frameLayout,
     cameraEye: cameraEye,
     viewProjection: viewProjection,
     createViewer: createViewer,
